@@ -1,0 +1,12 @@
+---
+- hosts: all
+  become: true
+  become_user: root
+  gather_facts: false
+
+  tasks:
+    # Start local SAP server
+    - name: Start local SAP server
+      ansible.builtin.command: /opt/sap/bin/sap_start
+      register: sap_start_command
+      changed_when: sap_start_command.rc != 0

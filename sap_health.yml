@@ -1,0 +1,12 @@
+---
+- hosts: all
+  become: true
+  become_user: root
+  gather_facts: false
+
+  tasks:
+    # Check local SAP server
+    - name: Check local SAP server
+      ansible.builtin.command: /opt/sap/bin/sap_health
+      register: sap_health_command
+      changed_when: sap_health_command.rc != 0
