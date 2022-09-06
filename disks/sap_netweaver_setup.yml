@@ -1,0 +1,84 @@
+---
+- hosts: all
+  become: true
+  become_user: root
+
+  tasks:
+    # Install parted
+    - name: Install parted
+      ansible.builtin.package:
+        name: parted
+        state: present
+
+    # Check if SAP disk exist on local system
+    - name: Check if /dev/disk/azure/scsi1/lun0 exists
+      ansible.builtin.stat:
+        path: /dev/disk/azure/scsi1/lun0
+      register: stat_result_lun0
+
+    - name: Configure SAP disk
+      block:
+        # Setup disk layout for sap system
+        - name: Use all disk space on /dev/disk/azure/scsi1/lun0 for LVM
+          ansible.builtin.parted:
+            device: '/dev/disk/azure/scsi1/lun0'
+            number: 1
+            flags: [ lvm ]
+            state: present
+
+        # Setup volume group for SAP
+        - name: Create a volume group on /dev/disk/azure/scsi1/lun0-part1
+          community.general.lvg:
+            vg: sapvg
+            pvs: /dev/disk/azure/scsi1/lun0-part1
+
+        # Setup logical volumes for SAP
+        - name: Create 48G logical volume sapmntlv and usrsaplv in volume group sapvg (SAP)
+          community.general.lvol:
+            vg: sapvg
+            lv: '{{ item }}'
+            size: 48g
+          loop:
+            - sapmntlv
+            - usrsaplv
+
+        # Format logical SAP volumes
+        - name: Create an xfs filesystem on /dev/sapvg/sapmntlv and /dev/sapvg/usrsaplv
+          community.general.filesystem:
+            fstype: xfs
+            state: present
+            dev: '{{ item }}'
+          loop:
+            - /dev/sapvg/sapmntlv
+            - /dev/sapvg/usrsaplv
+
+        # Create SAP mount points
+        - name: Create SAP directory /sapmnt and /usr/sap
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /sapmnt
+            - /usr/sap
+
+        # Mount logical SAP volumes
+        - name: mount the sapmntlv on /sapmnt
+          ansible.posix.mount:
+            path: /sapmnt
+            src: /dev/sapvg/sapmntlv
+            fstype: xfs
+            state: mounted
+
+        - name: mount the usrsaplv on /usr/sap
+          ansible.posix.mount:
+            path: /usr/sap
+            src: /dev/sapvg/usrsaplv
+            fstype: xfs
+            state: mounted
+
+      when:
+        - ansible_facts['system_vendor'] == "Microsoft Corporation"
+        - ansible_facts['product_name'] == "Virtual Machine"
+        - ansible_facts['distribution'] == "RedHat"
+        - stat_result_lun0.stat.exists

@@ -1,0 +1,39 @@
+---
+- hosts: all
+  become: true
+  become_user: root
+
+  tasks:
+    - name: Configure shared disk
+      block:
+        # Create SAP mount points
+        - name: Create shared directory /usr/sap/trans and /sapdump
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /usr/sap/trans
+            - /sapdump
+
+        # Mount logical SAP volumes
+        - name: mount NFS on /usr/sap/trans
+          ansible.posix.mount:
+            path: /usr/sap/trans
+            src: 10.242.90.74:/sapstr03/saptrans
+            opts: auto,nofail,noatime,nolock,intr,tcp,actimeo=1800
+            fstype: nfs
+            state: mounted
+
+        - name: mount NFS on /sapdump
+          ansible.posix.mount:
+            path: /sapdump
+            src: 10.242.90.132:/sapdump
+            opts: auto,nofail,noatime,nolock,intr,tcp,actimeo=1800
+            fstype: nfs
+            state: mounted
+
+      when:
+        - ansible_facts['system_vendor'] == "Microsoft Corporation"
+        - ansible_facts['product_name'] == "Virtual Machine"
+        - ansible_facts['distribution'] == "RedHat"

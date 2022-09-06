@@ -1,0 +1,138 @@
+---
+- hosts: all
+  become: true
+  become_user: root
+
+  tasks:
+    # Install parted
+    - name: Install parted
+      ansible.builtin.package:
+        name: parted
+        state: present
+
+    # Check if HANA disks exist on local system
+    - name: Check if /dev/disk/azure/scsi1/lun1 exists
+      ansible.builtin.stat:
+        path: /dev/disk/azure/scsi1/lun1
+      register: stat_result_lun1
+
+    - name: Check if /dev/disk/azure/scsi1/lun2 exists
+      ansible.builtin.stat:
+        path: /dev/disk/azure/scsi1/lun2
+      register: stat_result_lun2
+
+    - name: Check if /dev/disk/azure/scsi1/lun3 exists
+      ansible.builtin.stat:
+        path: /dev/disk/azure/scsi1/lun3
+      register: stat_result_lun3
+
+    - name: Check if /dev/disk/azure/scsi1/lun4 exists
+      ansible.builtin.stat:
+        path: /dev/disk/azure/scsi1/lun4
+      register: stat_result_lun4
+
+    - name: Check if /dev/disk/azure/scsi1/lun5 exists
+      ansible.builtin.stat:
+        path: /dev/disk/azure/scsi1/lun5
+      register: stat_result_lun5
+
+    - name: Check if /dev/disk/azure/scsi1/lun6 exists
+      ansible.builtin.stat:
+        path: /dev/disk/azure/scsi1/lun6
+      register: stat_result_lun6
+    
+    - name: Configure HANA disks
+      block:
+        # Setup disk layout for HANA system
+        - name: Use remaining disk space for LVM
+          ansible.builtin.parted:
+            device: '{{ item }}'
+            number: 1
+            flags: [ lvm ]
+            state: present
+          loop:
+            - /dev/disk/azure/scsi1/lun1
+            - /dev/disk/azure/scsi1/lun2
+            - /dev/disk/azure/scsi1/lun3
+            - /dev/disk/azure/scsi1/lun4
+            - /dev/disk/azure/scsi1/lun5
+            - /dev/disk/azure/scsi1/lun6
+
+        # Setup volume group hanavg for HANA DB
+        - name: Create a HANA volume group on /dev/disk/azure/scsi1/lunX-part1
+          community.general.lvg:
+            vg: hanavg
+            pvs: /dev/disk/azure/scsi1/lun1-part1,/dev/disk/azure/scsi1/lun2-part1,/dev/disk/azure/scsi1/lun3-part1,/dev/disk/azure/scsi1/lun4-part1,/dev/disk/azure/scsi1/lun5-part1,/dev/disk/azure/scsi1/lun6-part1
+
+        # Setup striped logical volumes for HANA DB
+        - name: Create 144G logical volume hanasharedlv and hanaloglv in volume group hanavg
+          community.general.lvol:
+            vg: hanavg
+            lv: '{{ item }}'
+            opts: '-i 6'
+            size: 144g
+          loop:
+            - hanasharedlv
+            - hanaloglv
+        
+        - name: Create 512G logical volume hanadatalv in volume group hanavg
+          community.general.lvol:
+            vg: hanavg
+            lv: hanadatalv
+            opts: '-i 6'
+            size: 512g
+
+        # Format logical HANA DB volumes
+        - name: Create an xfs filesystem on /dev/hanavg/hanasharedlv, /dev/hanavg/hanaloglv and /dev/hanavg/hanadatalv
+          community.general.filesystem:
+            fstype: xfs
+            state: present
+            dev: '{{ item }}'
+          loop:
+            - /dev/hanavg/hanasharedlv
+            - /dev/hanavg/hanaloglv
+            - /dev/hanavg/hanadatalv
+
+        # Create HANA mount points
+        - name: Create SAP directory /hana/shared, /hana/log and /hana/data
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /hana/shared
+            - /hana/log
+            - /hana/data
+
+        # Mount logical HANA volumes
+        - name: mount the hanasharedlv on /hana/shared
+          ansible.posix.mount:
+            path: /hana/shared
+            src: /dev/hanavg/hanasharedlv
+            fstype: xfs
+            state: mounted
+
+        - name: mount the hanaloglv on /hana/log
+          ansible.posix.mount:
+            path: /hana/log
+            src: /dev/hanavg/hanaloglv
+            fstype: xfs
+            state: mounted
+
+        - name: mount the hanadatalv on /hana/data
+          ansible.posix.mount:
+            path: /hana/data
+            src: /dev/hanavg/hanadatalv
+            fstype: xfs
+            state: mounted
+
+      when:
+        - ansible_facts['system_vendor'] == "Microsoft Corporation"
+        - ansible_facts['product_name'] == "Virtual Machine"
+        - ansible_facts['distribution'] == "RedHat"
+        - stat_result_lun1.stat.exists
+        - stat_result_lun2.stat.exists
+        - stat_result_lun3.stat.exists
+        - stat_result_lun4.stat.exists
+        - stat_result_lun5.stat.exists
+        - stat_result_lun6.stat.exists

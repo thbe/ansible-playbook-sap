@@ -1,0 +1,71 @@
+---
+- hosts: all
+  become: true
+  become_user: root
+
+  anf_storage_options: 'rw,bg,hard,timeo=600,noatime,rsize=1048576,wsize=262144,vers=4,minorversion=1,lock'
+
+  tasks:
+    - name: Configure shared disk
+      block:
+        # Create SAP HANA mount points
+        - name: Create HANA directories /hana/shared, /hana/log, /hana/data and /hana/backup
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /hana/shared
+            - /hana/log
+            - /hana/data
+            - /hana/backup
+            - /hana/log/backup
+            - /hana/data/backup
+
+        # Mount logical SAP volumes
+        - name: Mount ANF NFS on /hana/shared
+          ansible.posix.mount:
+            path: /hana/shared
+            src: '{{ anf_storage_hana_shared }}'
+            opts: '{{ anf_storage_options }}'
+            fstype: nfs
+            state: mounted
+
+        - name: Mount ANF NFS on /hana/log
+          ansible.posix.mount:
+            path: /hana/log
+            src: '{{ anf_storage_hana_log }}'
+            opts: '{{ anf_storage_options }}'
+            fstype: nfs
+            state: mounted
+
+        - name: Mount ANF NFS on /hana/data
+          ansible.posix.mount:
+            path: /hana/data
+            src: '{{ anf_storage_hana_data }}'
+            opts: '{{ anf_storage_options }}'
+            fstype: nfs
+            state: mounted
+
+        - name: Mount ANF NFS on /hana/backup
+          ansible.posix.mount:
+            path: /hana/backup
+            src: '{{ anf_storage_hana_backup }}'
+            opts: '{{ anf_storage_options }}'
+            fstype: nfs
+            state: mounted
+
+        # Create backup directories for log and data
+        - name: Create HANA directories /hana/backup/log and /hana/backup/data
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /hana/backup/log
+            - /hana/backup/data
+
+      when:
+        - ansible_facts['system_vendor'] == "Microsoft Corporation"
+        - ansible_facts['product_name'] == "Virtual Machine"
+        - ansible_facts['distribution'] == "RedHat"
