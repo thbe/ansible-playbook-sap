@@ -206,7 +206,7 @@
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs constraint location {{ sap_instance_sid }}_hana_nfs_primary \
-              rule score=-INFINITY resource-discovery=never \#uname eq {{ sap_ha_primary }}
+              rule score=-INFINITY resource-discovery=never \#uname eq {{ sap_ha_secondary }}
           register: sap_ha_cluster_constraint_locate
           changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
           when:
@@ -216,7 +216,7 @@
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs constraint location {{ sap_instance_sid }}_hana_nfs_secondary \
-              rule score=-INFINITY resource-discovery=never \#uname eq {{ sap_ha_secondary }}
+              rule score=-INFINITY resource-discovery=never \#uname eq {{ sap_ha_primary }}
           register: sap_ha_cluster_constraint_locate
           changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
           when:
