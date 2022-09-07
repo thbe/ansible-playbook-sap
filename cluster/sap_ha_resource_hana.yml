@@ -1,16 +1,28 @@
 ---
 # Ensure that the cluster is in maintenance mode
 - name: Ensure Cluster is in maintenance mode
-  command: pcs property set maintenance-mode=true
-  register: maintenance_cluster
-  changed_when: "'error' not in maintenance_cluster.stdout"
+  ansible.builtin.command:
+    cmd: "/usr/sbin/pcs property set maintenance-mode=true"
+  register: sap_ha_cluster_mode
+  changed_when: "'error' not in sap_ha_cluster_mode.stdout"
   when:
     - ansible_facts['fqdn'] == sap_ha_primary
 
+
+- name: Capturing status for the Pacemaker high-availability cluster
+  ansible.builtin.shell:
+    cmd: "/usr/sbin/pcs status || /bin/true"
+  register: sap_ha_cluster_status
+  changed_when: sap_ha_cluster_status.rc != 0
+  when:
+    - ansible_facts['fqdn'] == sap_ha_primary
+
+
 - name: Ensure stickiness is configured properly
-  command: pcs resource defaults resource-stickiness=1000
-  register: rconfig
-  changed_when: "'Defaults do not apply to resource' in rconfig.stdout"
+  ansible.builtin.command:
+    cmd: "/usr/sbin/pcs resource defaults resource-stickiness=1000"
+  register: sap_ha_cluster_resource_config
+  changed_when: "'Defaults do not apply to resource' in sap_ha_cluster_resource_config.stdout"
   when: sap_hana_ha_pacemaker_stickiness
 
 - name: Ensure migration threshold is configured properly
