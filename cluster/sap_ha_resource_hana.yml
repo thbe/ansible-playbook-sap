@@ -89,7 +89,7 @@
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs constraint order SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone  \
-              then SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-master symmetrical=false
+              then SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone symmetrical=false
           register: sap_ha_cluster_constraint_create
           changed_when: "'Adding SAPHanaTopology' in sap_ha_cluster_constraint_create.stdout"
           when:
@@ -99,7 +99,7 @@
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs constraint colocation add vip_{{ sap_instance_sid }}_{{ sap_instance_number }} \
-              with master SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-master 2000
+              with master SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone 4000
           register: sap_ha_cluster_constraint_colocate
           changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
           when:
@@ -119,7 +119,7 @@
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs constraint colocation add vip2_{{ sap_instance_sid }}_{{ sap_instance_number }} \
-              with slave SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone 2000
+              with slave SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone 4000
           register: sap_ha_cluster_constraint_colocate
           changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
           when:
