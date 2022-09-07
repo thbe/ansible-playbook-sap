@@ -9,18 +9,6 @@
   tasks:
     - name: Configure HANA cluster
       block:
-        # Create SAP HANA mount points
-        - name: Create HANA directories /hana/shared, /hana/log, /hana/data and /hana/backup
-          ansible.builtin.file:
-            path: '{{ item }}'
-            state: directory
-            mode: '0775'
-          loop:
-            - /hana/shared
-            - /hana/log
-            - /hana/data
-            - /hana/backup
-
         # Ensure that the cluster is in maintenance mode
         - name: Ensure Cluster is in maintenance mode
           ansible.builtin.command:
@@ -129,6 +117,19 @@
             - ansible_facts['fqdn'] == sap_ha_secondary
 
         # Create NFS shares
+        - name: Create HANA directories /hana/shared, /hana/log, /hana/data and /hana/backup
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /hana/shared
+            - /hana/log
+            - /hana/data
+            - /hana/backup
+          when:
+            - sap_anf|bool == true
+
         - name: Create HANA ANF shared resource on primary node
           ansible.builtin.shell:
             cmd: |
@@ -140,6 +141,7 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Create HANA log resource on primary node
           ansible.builtin.shell:
@@ -152,6 +154,7 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Create HANA data resource on primary node
           ansible.builtin.shell:
@@ -164,6 +167,7 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Create HANA shared resource on secondary node
           ansible.builtin.shell:
@@ -176,6 +180,7 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_secondary
+            - sap_anf|bool == true
 
         - name: Create HANA log resource on secondary node
           ansible.builtin.shell:
@@ -188,6 +193,7 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_secondary
+            - sap_anf|bool == true
 
         - name: Create HANA data resource on secondary node
           ansible.builtin.shell:
@@ -200,6 +206,7 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_secondary
+            - sap_anf|bool == true
 
         # Set constrains for NFS shares
         - name: Locate cluster constrain for unique mounts on primary node
@@ -211,6 +218,7 @@
           changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Locate cluster constrain for unique mounts on secondary node
           ansible.builtin.shell:
@@ -221,6 +229,7 @@
           changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Create HANA NFS active resource on primary node
           ansible.builtin.shell:
@@ -232,6 +241,7 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Create HANA NFS active resource on secondary node
           ansible.builtin.shell:
@@ -243,6 +253,7 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Configure location constraints on primary node
           ansible.builtin.shell:
@@ -253,6 +264,7 @@
           changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Configure location constraints on secondary node
           ansible.builtin.shell:
@@ -263,6 +275,7 @@
           changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Configure order constraints on primary node
           ansible.builtin.shell:
@@ -273,6 +286,7 @@
           changed_when: "'error' not in sap_ha_cluster_constraint_order.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Configure order constraints on secondary node
           ansible.builtin.shell:
@@ -283,6 +297,7 @@
           changed_when: "'error' not in sap_ha_cluster_constraint_order.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         # Configure NFS shares for SAP HANA resources
         - name: Configure order constraints on secondary node
@@ -295,6 +310,7 @@
           changed_when: "'error' not in sap_ha_cluster_constraint_order.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         - name: Configure order constraints on secondary node
           ansible.builtin.shell:
@@ -306,6 +322,7 @@
           changed_when: "'error' not in sap_ha_cluster_constraint_order.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_anf|bool == true
 
         # Disable the stonith device
         - name: Disable stonith for the the Pacemaker high-availability cluster
