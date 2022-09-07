@@ -8,111 +8,119 @@
   when:
     - ansible_facts['fqdn'] == sap_ha_primary
 
-
-- name: Capturing status for the Pacemaker high-availability cluster
-  ansible.builtin.shell:
-    cmd: "/usr/sbin/pcs status || /bin/true"
-  register: sap_ha_cluster_status
-  changed_when: sap_ha_cluster_status.rc != 0
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
-
-
+# Ensure properties are set correctly
 - name: Ensure stickiness is configured properly
   ansible.builtin.command:
     cmd: "/usr/sbin/pcs resource defaults resource-stickiness=1000"
   register: sap_ha_cluster_resource_config
   changed_when: "'Defaults do not apply to resource' in sap_ha_cluster_resource_config.stdout"
-  when: sap_hana_ha_pacemaker_stickiness
+  when:
+    - ansible_facts['fqdn'] == sap_ha_primary
 
 - name: Ensure migration threshold is configured properly
-  command: pcs resource defaults migration-threshold=5000
-  register: rconfig
-  changed_when: "'Defaults do not apply to resource' in rconfig.stdout"
-  when: sap_hana_ha_pacemaker_threshold
+  ansible.builtin.command:
+    cmd: "/usr/sbin/pcs resource defaults migration-threshold=5000"
+  register: sap_ha_cluster_resource_config
+  changed_when: "'Defaults do not apply to resource' in sap_ha_cluster_resource_config.stdout"
+  when:
+    - ansible_facts['fqdn'] == sap_ha_primary
 
+# Create SAP HANA resources
 - name: Create SAP HANA topology
-  shell: |
-    pcs resource create SAPHanaTopology_{{ sap_ha_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }} \
-    SAPHanaTopology SID={{ sap_hana_ha_pacemaker_hana_sid }} InstanceNumber={{ sap_hana_ha_pacemaker_hana_instance_number }} \
-    op start timeout=600 \
-    op stop timeout=300 \
-    op monitor interval=10 timeout=600 \
-    clone clone-max=2 clone-node-max=1 interleave=true
-  register: create_resource
-  changed_when: "'Assumed agent name' in create_resource.stdout"
+  ansible.builtin.shell:
+    cmd: |
+      /usr/sbin/pcs resource create SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+      SAPHanaTopology SID={{ sap_instance_sid }} InstanceNumber={{ sap_instance_number }} \
+      op start timeout=600 \
+      op stop timeout=300 \
+      op monitor interval=10 timeout=600 \
+      clone clone-max=2 clone-node-max=1 interleave=true
+  register: sap_ha_cluster_resource_create
+  changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
   when:
     - ansible_facts['fqdn'] == sap_ha_primary
 
 - name: Create SAP HANA resource agent
-  shell: |
-    pcs resource create SAPHana_{{ sap_hana_ha_pacemaker_hana_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }} \
-    SAPHana SID={{ sap_hana_ha_pacemaker_hana_sid }} InstanceNumber={{ sap_hana_ha_pacemaker_hana_instance_number }} \
-    PREFER_SITE_TAKEOVER=true DUPLICATE_PRIMARY_TIMEOUT=7200 AUTOMATED_REGISTER=true \
-    op start timeout=3600 \
-    op stop timeout=3600 \
-    op monitor interval=61 role="Slave" timeout=700 \
-    op monitor interval=59 role="Master" timeout=700 \
-    op promote timeout=3600 \
-    op demote timeout=3600 \
-    master notify=true clone-max=2 clone-node-max=1 interleave=true
-  register: create_resource
-  changed_when: "'Assumed agent name' in create_resource.stdout"
-  run_once: true
+  ansible.builtin.shell:
+    cmd: |
+      pcs resource create SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+      SAPHana SID={{ sap_instance_sid }} InstanceNumber={{ sap_instance_number }} \
+      PREFER_SITE_TAKEOVER=true DUPLICATE_PRIMARY_TIMEOUT=7200 AUTOMATED_REGISTER=true \
+      op start timeout=3600 \
+      op stop timeout=3600 \
+      op monitor interval=61 role="Slave" timeout=700 \
+      op monitor interval=59 role="Master" timeout=700 \
+      op promote timeout=3600 \
+      op demote timeout=3600 \
+      master notify=true clone-max=2 clone-node-max=1 interleave=true
+  register: sap_ha_cluster_resource_create
+  changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+  when:
+    - ansible_facts['fqdn'] == sap_ha_primary
 
 - name: Create Virtual IP resource
-  shell: |
-    pcs resource create vip_{{ sap_hana_ha_pacemaker_hana_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }}  \
-    IPaddr2 ip="{{ sap_hana_ha_pacemaker_vip }}"
-  register: create_resource
-  changed_when: "'Assumed agent name' in create_resource.stdout"
-  run_once: true
+  ansible.builtin.shell:
+    cmd: |
+      pcs resource create vip_{{ sap_instance_sid }}_{{ sap_instance_number }}  \
+      IPaddr2 ip="{{ sap_ha_vip_hana_primary }}"
+  register: sap_ha_cluster_resource_create
+  changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+  when:
+    - ansible_facts['fqdn'] == sap_ha_primary
 
 - name: Create Cluster constraint
-  shell: |
-    pcs constraint order SAPHanaTopology_{{ sap_hana_ha_pacemaker_hana_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }}-clone  \
-    then SAPHana_{{ sap_hana_ha_pacemaker_hana_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }}-master symmetrical=false
-  register: create_constraint
-  changed_when: "'Adding SAPHanaTopology' in create_constraint.stdout"
-  run_once: true
+  ansible.builtin.shell:
+    cmd: |
+      pcs constraint order SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone  \
+      then SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-master symmetrical=false
+  register: sap_ha_cluster_constraint_create
+  changed_when: "'Adding SAPHanaTopology' in sap_ha_cluster_constraint_create.stdout"
+  when:
+    - ansible_facts['fqdn'] == sap_ha_primary
 
 - name: Colocate Cluster constraint
-  shell: |
-    pcs constraint colocation add vip_{{ sap_hana_ha_pacemaker_hana_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }} \
-    with master SAPHana_{{ sap_hana_ha_pacemaker_hana_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }}-master 2000
-  register: colocate_constraint
-  changed_when: "'error' not in colocate_constraint.stdout"
-  run_once: true
+  ansible.builtin.shell:
+    cmd: |
+      pcs constraint colocation add vip_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+      with master SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-master 2000
+  register: sap_ha_cluster_constraint_colocate
+  changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
+  when:
+    - ansible_facts['fqdn'] == sap_ha_primary
 
 - name: Create second Virtual IP resource for Active/Read-Enabled HANA on the secondary node
-  shell: |
-    pcs resource create vip2_{{ sap_hana_ha_pacemaker_hana_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }} \
-    IPaddr2 ip="{{ sap_hana_ha_pacemaker_secondary_vip }}"
+  ansible.builtin.shell:
+    cmd: |
+      pcs resource create vip2_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+      IPaddr2 ip="{{ sap_ha_vip_hana_secondary }}"
+  register: sap_ha_cluster_resource_create
+  changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
   when:
-    - sap_hana_ha_pacemaker_secondary_read
-  register: create_resource
-  changed_when: "'Assumed agent name' in create_resource.stdout"
-  run_once: true
+    - ansible_facts['fqdn'] == sap_ha_secondary
 
 - name: Colocate Cluster constrain for Active/Read-Enabled HANA on the secondary node
-  shell: |
-    pcs constraint colocation add vip2_{{ sap_hana_ha_pacemaker_hana_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }} \
-    with slave SAPHana_{{ sap_hana_ha_pacemaker_hana_sid }}_{{ sap_hana_ha_pacemaker_hana_instance_number }}-clone 2000
+  ansible.builtin.shell:
+    cmd: |
+      pcs constraint colocation add vip2_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+      with slave SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone 2000
+  register: sap_ha_cluster_constraint_colocate
+  changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
   when:
-    - sap_hana_ha_pacemaker_secondary_read
-  register: colocate_constrain
-  changed_when: "'error' not in colocate_constrain.stdout"
-  run_once: true
+    - ansible_facts['fqdn'] == sap_ha_secondary
 
-## This is a temporary thing until different stonith methods are configured
-- name: Disable stonith until proper methods are added to the role
-  command: pcs property set stonith-enabled=false
-  register: stonith
-  changed_when: "'error' not in stonith.stdout"
-  run_once: true
+- name: Disable stonith for the the Pacemaker high-availability cluster
+  ansible.builtin.command:
+    cmd: /usr/sbin/pcs property set stonith-enabled=false
+  register: sap_ha_cluster_property_set
+  changed_when: "'stonith-enabled: false' in sap_ha_cluster_property_set.stdout"
+  when:
+    - ansible_facts['fqdn'] == sap_ha_primary
+    - "sap_ha_cluster_properties.stdout.find('stonith-enabled: true') != -1"
 
-- name: Ensure Cluster is NOT in maintenance mode
-  command: pcs property set maintenance-mode=false
-  register: maintenance_cluster
-  changed_when: "'error' not in maintenance_cluster.stdout"
-  run_once: true
+- name: Ensure Cluster is not in maintenance mode
+  ansible.builtin.command:
+    cmd: "/usr/sbin/pcs property set maintenance-mode=false"
+  register: sap_ha_cluster_mode
+  changed_when: "'error' not in sap_ha_cluster_mode.stdout"
+  when:
+    - ansible_facts['fqdn'] == sap_ha_primary
