@@ -64,14 +64,12 @@
             cmd: |
               /usr/sbin/pcs resource create SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }} \
               SAPHana SID={{ sap_instance_sid }} InstanceNumber={{ sap_instance_number }} \
-              PREFER_SITE_TAKEOVER=true DUPLICATE_PRIMARY_TIMEOUT=7200 AUTOMATED_REGISTER=true \
-              op start timeout=3600 \
-              op stop timeout=3600 \
+              PREFER_SITE_TAKEOVER=true DUPLICATE_PRIMARY_TIMEOUT=7200 AUTOMATED_REGISTER=false \
+              op start timeout=3600 op stop timeout=3600 \
               op monitor interval=61 role="Slave" timeout=700 \
               op monitor interval=59 role="Master" timeout=700 \
-              op promote timeout=3600 \
-              op demote timeout=3600 \
-              master notify=true clone-max=2 clone-node-max=1 interleave=true
+              op promote timeout=3600 op demote timeout=3600 \
+              promotable notify=true clone-max=2 clone-node-max=1 interleave=true
           register: sap_ha_cluster_resource_create
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
