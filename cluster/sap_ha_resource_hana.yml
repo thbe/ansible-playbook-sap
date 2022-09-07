@@ -3,6 +3,9 @@
   become: true
   become_user: root
 
+  vars:
+    anf_storage_options: 'rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys'
+
   tasks:
     - name: Configure HANA cluster
       block:
@@ -126,7 +129,7 @@
             - ansible_facts['fqdn'] == sap_ha_secondary
 
         # Create NFS shares
-        - name: Create HANA shared resource on primary node
+        - name: Create HANA ANF shared resource on primary node
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs resource create {{ sap_instance_sid }}_hana_shared_primary \
