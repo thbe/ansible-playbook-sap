@@ -3,7 +3,7 @@
   become: true
   become_user: root
 
-  anf_storage_options: 'rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys'
+  sap_anf_options: 'rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys'
 
   tasks:
     - name: Configure shared disks
@@ -19,39 +19,37 @@
             - /hana/log
             - /hana/data
             - /hana/backup
-            - /hana/log/backup
-            - /hana/data/backup
 
         # Mount logical SAP volumes
         - name: Mount ANF NFS on /hana/shared
           ansible.posix.mount:
             path: /hana/shared
-            src: '{{ anf_storage_hana_shared }}'
-            opts: '{{ anf_storage_options }}'
+            src: '{{ sap_anf_hana_shared }}'
+            opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
 
         - name: Mount ANF NFS on /hana/log
           ansible.posix.mount:
             path: /hana/log
-            src: '{{ anf_storage_hana_log }}'
-            opts: '{{ anf_storage_options }}'
+            src: '{{ sap_anf_hana_log }}'
+            opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
 
         - name: Mount ANF NFS on /hana/data
           ansible.posix.mount:
             path: /hana/data
-            src: '{{ anf_storage_hana_data }}'
-            opts: '{{ anf_storage_options }}'
+            src: '{{ sap_anf_hana_data }}'
+            opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
 
         - name: Mount ANF NFS on /hana/backup
           ansible.posix.mount:
             path: /hana/backup
-            src: '{{ anf_storage_hana_backup }}'
-            opts: '{{ anf_storage_options }}'
+            src: '{{ sap_anf_hana_backup }}'
+            opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
 

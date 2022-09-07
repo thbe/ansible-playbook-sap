@@ -1,126 +1,331 @@
 ---
-# Ensure that the cluster is in maintenance mode
-- name: Ensure Cluster is in maintenance mode
-  ansible.builtin.command:
-    cmd: "/usr/sbin/pcs property set maintenance-mode=true"
-  register: sap_ha_cluster_mode
-  changed_when: "'error' not in sap_ha_cluster_mode.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
+- hosts: all
+  become: true
+  become_user: root
 
-# Ensure properties are set correctly
-- name: Ensure stickiness is configured properly
-  ansible.builtin.command:
-    cmd: "/usr/sbin/pcs resource defaults resource-stickiness=1000"
-  register: sap_ha_cluster_resource_config
-  changed_when: "'Defaults do not apply to resource' in sap_ha_cluster_resource_config.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
+  anf_storage_options: "rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys"
 
-- name: Ensure migration threshold is configured properly
-  ansible.builtin.command:
-    cmd: "/usr/sbin/pcs resource defaults migration-threshold=5000"
-  register: sap_ha_cluster_resource_config
-  changed_when: "'Defaults do not apply to resource' in sap_ha_cluster_resource_config.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
+  tasks:
+    - name: Configure HANA cluster
+      block:
+        # Create SAP HANA mount points
+        - name: Create HANA directories /hana/shared, /hana/log, /hana/data and /hana/backup
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /hana/shared
+            - /hana/log
+            - /hana/data
+            - /hana/backup
 
-# Create SAP HANA resources
-- name: Create SAP HANA topology
-  ansible.builtin.shell:
-    cmd: |
-      /usr/sbin/pcs resource create SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }} \
-      SAPHanaTopology SID={{ sap_instance_sid }} InstanceNumber={{ sap_instance_number }} \
-      op start timeout=600 \
-      op stop timeout=300 \
-      op monitor interval=10 timeout=600 \
-      clone clone-max=2 clone-node-max=1 interleave=true
-  register: sap_ha_cluster_resource_create
-  changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
+        # Ensure that the cluster is in maintenance mode
+        - name: Ensure Cluster is in maintenance mode
+          ansible.builtin.command:
+            cmd: "/usr/sbin/pcs property set maintenance-mode=true"
+          register: sap_ha_cluster_mode
+          changed_when: "'error' not in sap_ha_cluster_mode.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
 
-- name: Create SAP HANA resource agent
-  ansible.builtin.shell:
-    cmd: |
-      pcs resource create SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }} \
-      SAPHana SID={{ sap_instance_sid }} InstanceNumber={{ sap_instance_number }} \
-      PREFER_SITE_TAKEOVER=true DUPLICATE_PRIMARY_TIMEOUT=7200 AUTOMATED_REGISTER=true \
-      op start timeout=3600 \
-      op stop timeout=3600 \
-      op monitor interval=61 role="Slave" timeout=700 \
-      op monitor interval=59 role="Master" timeout=700 \
-      op promote timeout=3600 \
-      op demote timeout=3600 \
-      master notify=true clone-max=2 clone-node-max=1 interleave=true
-  register: sap_ha_cluster_resource_create
-  changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
+        # Ensure properties are set correctly
+        - name: Ensure stickiness is configured properly
+          ansible.builtin.command:
+            cmd: "/usr/sbin/pcs resource defaults resource-stickiness=1000"
+          register: sap_ha_cluster_resource_config
+          changed_when: "'Defaults do not apply to resource' in sap_ha_cluster_resource_config.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
 
-- name: Create Virtual IP resource
-  ansible.builtin.shell:
-    cmd: |
-      pcs resource create vip_{{ sap_instance_sid }}_{{ sap_instance_number }}  \
-      IPaddr2 ip="{{ sap_ha_vip_hana_primary }}"
-  register: sap_ha_cluster_resource_create
-  changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
+        - name: Ensure migration threshold is configured properly
+          ansible.builtin.command:
+            cmd: "/usr/sbin/pcs resource defaults migration-threshold=5000"
+          register: sap_ha_cluster_resource_config
+          changed_when: "'Defaults do not apply to resource' in sap_ha_cluster_resource_config.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
 
-- name: Create Cluster constraint
-  ansible.builtin.shell:
-    cmd: |
-      pcs constraint order SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone  \
-      then SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-master symmetrical=false
-  register: sap_ha_cluster_constraint_create
-  changed_when: "'Adding SAPHanaTopology' in sap_ha_cluster_constraint_create.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
+        # Create SAP HANA cluster resources
+        - name: Create SAP HANA topology
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+              SAPHanaTopology SID={{ sap_instance_sid }} InstanceNumber={{ sap_instance_number }} \
+              op start timeout=600 \
+              op stop timeout=300 \
+              op monitor interval=10 timeout=600 \
+              clone clone-max=2 clone-node-max=1 interleave=true
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
 
-- name: Colocate Cluster constraint
-  ansible.builtin.shell:
-    cmd: |
-      pcs constraint colocation add vip_{{ sap_instance_sid }}_{{ sap_instance_number }} \
-      with master SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-master 2000
-  register: sap_ha_cluster_constraint_colocate
-  changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
+        - name: Create SAP HANA resource agent
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+              SAPHana SID={{ sap_instance_sid }} InstanceNumber={{ sap_instance_number }} \
+              PREFER_SITE_TAKEOVER=true DUPLICATE_PRIMARY_TIMEOUT=7200 AUTOMATED_REGISTER=true \
+              op start timeout=3600 \
+              op stop timeout=3600 \
+              op monitor interval=61 role="Slave" timeout=700 \
+              op monitor interval=59 role="Master" timeout=700 \
+              op promote timeout=3600 \
+              op demote timeout=3600 \
+              master notify=true clone-max=2 clone-node-max=1 interleave=true
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
 
-- name: Create second Virtual IP resource for Active/Read-Enabled HANA on the secondary node
-  ansible.builtin.shell:
-    cmd: |
-      pcs resource create vip2_{{ sap_instance_sid }}_{{ sap_instance_number }} \
-      IPaddr2 ip="{{ sap_ha_vip_hana_secondary }}"
-  register: sap_ha_cluster_resource_create
-  changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_secondary
+        - name: Create Virtual IP resource
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create vip_{{ sap_instance_sid }}_{{ sap_instance_number }}  \
+              IPaddr2 ip="{{ sap_ha_vip_hana_primary }}"
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
 
-- name: Colocate Cluster constrain for Active/Read-Enabled HANA on the secondary node
-  ansible.builtin.shell:
-    cmd: |
-      pcs constraint colocation add vip2_{{ sap_instance_sid }}_{{ sap_instance_number }} \
-      with slave SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone 2000
-  register: sap_ha_cluster_constraint_colocate
-  changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_secondary
+        - name: Create Cluster constraint
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint order SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone  \
+              then SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-master symmetrical=false
+          register: sap_ha_cluster_constraint_create
+          changed_when: "'Adding SAPHanaTopology' in sap_ha_cluster_constraint_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
 
-- name: Disable stonith for the the Pacemaker high-availability cluster
-  ansible.builtin.command:
-    cmd: /usr/sbin/pcs property set stonith-enabled=false
-  register: sap_ha_cluster_property_set
-  changed_when: "'stonith-enabled: false' in sap_ha_cluster_property_set.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
-    - "sap_ha_cluster_properties.stdout.find('stonith-enabled: true') != -1"
+        - name: Colocate Cluster constraint
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint colocation add vip_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+              with master SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-master 2000
+          register: sap_ha_cluster_constraint_colocate
+          changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
 
-- name: Ensure Cluster is not in maintenance mode
-  ansible.builtin.command:
-    cmd: "/usr/sbin/pcs property set maintenance-mode=false"
-  register: sap_ha_cluster_mode
-  changed_when: "'error' not in sap_ha_cluster_mode.stdout"
-  when:
-    - ansible_facts['fqdn'] == sap_ha_primary
+        - name: Create second Virtual IP resource for Active/Read-Enabled HANA on the secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create vip2_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+              IPaddr2 ip="{{ sap_ha_vip_hana_secondary }}"
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_secondary
+
+        - name: Colocate Cluster constrain for Active/Read-Enabled HANA on the secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint colocation add vip2_{{ sap_instance_sid }}_{{ sap_instance_number }} \
+              with slave SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone 2000
+          register: sap_ha_cluster_constraint_colocate
+          changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_secondary
+
+        # Create NFS shares
+        - name: Create HANA shared resource on primary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create {{ sap_instance_sid }}_hana_shared_primary \
+              ocf:heartbeat:Filesystem device={{ sap_anf_hana_shared }} directory=/hana/shared fstype=nfs \
+              options={{ sap_anf_options }} \
+              op monitor interval=20s on-fail=fence timeout=40s OCF_CHECK_LEVEL=20 --group {{ sap_instance_sid }}_hana_nfs_primary
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Create HANA log resource on primary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create {{ sap_instance_sid }}_hana_log_primary \
+              ocf:heartbeat:Filesystem device={{ sap_anf_hana_log }} directory=/hana/log fstype=nfs \
+              options={{ sap_anf_options }} \
+              op monitor interval=20s on-fail=fence timeout=40s OCF_CHECK_LEVEL=20 --group {{ sap_instance_sid }}_hana_nfs_primary
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Create HANA data resource on primary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create {{ sap_instance_sid }}_hana_data_primary \
+              ocf:heartbeat:Filesystem device={{ sap_anf_hana_data }} directory=/hana/data fstype=nfs \
+              options={{ sap_anf_options }} \
+              op monitor interval=20s on-fail=fence timeout=40s OCF_CHECK_LEVEL=20 --group {{ sap_instance_sid }}_hana_nfs_primary
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Create HANA shared resource on secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create {{ sap_instance_sid }}_hana_shared_secondary \
+              ocf:heartbeat:Filesystem device={{ sap_anf_hana_shared }} directory=/hana/shared fstype=nfs \
+              options={{ sap_anf_options }} \
+              op monitor interval=20s on-fail=fence timeout=40s OCF_CHECK_LEVEL=20 --group {{ sap_instance_sid }}_hana_nfs_secondary
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_secondary
+
+        - name: Create HANA log resource on secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create {{ sap_instance_sid }}_hana_log_secondary \
+              ocf:heartbeat:Filesystem device={{ sap_anf_hana_log }} directory=/hana/log fstype=nfs \
+              options={{ sap_anf_options }} \
+              op monitor interval=20s on-fail=fence timeout=40s OCF_CHECK_LEVEL=20 --group {{ sap_instance_sid }}_hana_nfs_secondary
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_secondary
+
+        - name: Create HANA data resource on secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create {{ sap_instance_sid }}_hana_data_secondary \
+              ocf:heartbeat:Filesystem device={{ sap_anf_hana_data }} directory=/hana/data fstype=nfs \
+              options={{ sap_anf_options }} \
+              op monitor interval=20s on-fail=fence timeout=40s OCF_CHECK_LEVEL=20 --group {{ sap_instance_sid }}_hana_nfs_secondary
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_secondary
+
+        # Set constrains for NFS shares
+        - name: Locate cluster constrain for unique mounts on primary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint location {{ sap_instance_sid }}_hana_nfs_primary \
+              rule score=-INFINITY resource-discovery=never \#uname eq {{ sap_ha_primary }}
+          register: sap_ha_cluster_constraint_locate
+          changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Locate cluster constrain for unique mounts on secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint location {{ sap_instance_sid }}_hana_nfs_secondary \
+              rule score=-INFINITY resource-discovery=never \#uname eq {{ sap_ha_secondary }}
+          register: sap_ha_cluster_constraint_locate
+          changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Create HANA NFS active resource on primary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create {{ sap_instance_sid }}_hana_nfs_primary_active \
+              ocf:pacemaker:attribute active_value=true \
+              inactive_value=false name={{ sap_instance_sid }}_hana_nfs_primary_active
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Create HANA NFS active resource on secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create {{ sap_instance_sid }}_hana_nfs_secondary_active \
+              ocf:pacemaker:attribute active_value=true \
+              inactive_value=false name={{ sap_instance_sid }}_hana_nfs_secondary_active
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Configure location constraints on primary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint location {{ sap_instance_sid }}_hana_nfs_primary \
+              avoids {{ sap_ha_secondary }}
+          register: sap_ha_cluster_constraint_locate
+          changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Configure location constraints on secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint location {{ sap_instance_sid }}_hana_nfs_secondary \
+              avoids {{ sap_ha_primary }}
+          register: sap_ha_cluster_constraint_locate
+          changed_when: "'error' not in sap_ha_cluster_constraint_locate.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Configure order constraints on primary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint order {{ sap_instance_sid }}_hana_nfs_primary \
+              then {{ sap_instance_sid }}_hana_nfs_primary_active
+          register: sap_ha_cluster_constraint_order
+          changed_when: "'error' not in sap_ha_cluster_constraint_order.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Configure order constraints on secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint order {{ sap_instance_sid }}_hana_nfs_secondary \
+              then {{ sap_instance_sid }}_hana_nfs_secondary_active
+          register: sap_ha_cluster_constraint_order
+          changed_when: "'error' not in sap_ha_cluster_constraint_order.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        # Configure NFS shares for SAP HANA resources
+        - name: Configure order constraints on secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint location SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone \
+              rule score=-INFINITY {{ sap_instance_sid }}_hana_nfs_primary_active ne true \
+              and {{ sap_instance_sid }}_hana_nfs_secondary_active ne true
+          register: sap_ha_cluster_constraint_order
+          changed_when: "'error' not in sap_ha_cluster_constraint_order.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Configure order constraints on secondary node
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint location SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone \
+              rule score=-INFINITY {{ sap_instance_sid }}_hana_nfs_primary_active ne true \
+              and {{ sap_instance_sid }}_hana_nfs_secondary_active ne true
+          register: sap_ha_cluster_constraint_order
+          changed_when: "'error' not in sap_ha_cluster_constraint_order.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        # Disable the stonith device
+        - name: Disable stonith for the the Pacemaker high-availability cluster
+          ansible.builtin.command:
+            cmd: /usr/sbin/pcs property set stonith-enabled=false
+          register: sap_ha_cluster_property_set
+          changed_when: "'stonith-enabled: false' in sap_ha_cluster_property_set.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+            - "sap_ha_cluster_properties.stdout.find('stonith-enabled: true') != -1"
+
+        # Ensure that the cluster is not in maintenance mode
+        - name: Ensure Cluster is not in maintenance mode
+          ansible.builtin.command:
+            cmd: "/usr/sbin/pcs property set maintenance-mode=false"
+          register: sap_ha_cluster_mode
+          changed_when: "'error' not in sap_ha_cluster_mode.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+      when:
+        - sap_ha|bool == true
