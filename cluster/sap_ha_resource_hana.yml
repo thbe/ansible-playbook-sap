@@ -344,3 +344,4 @@
 
       when:
         - sap_ha|bool == true
+        - sap_instance_product == 'HANA'
