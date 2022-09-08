@@ -5,21 +5,21 @@
 
   vars:
     sap_anf_options: 'rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys'
-    sap_anf_shared_saptrans: ''
-    sap_anf_shared_sapdump: ''
+    sap_anf_shared_saptrans: '10.242.91.139:/Global-saptrans'
+    sap_anf_shared_sapmedia: '10.242.90.132:/sapdump'
 
   tasks:
     - name: Configure shared disks
       block:
         # Create SAP mount points
-        - name: Create shared directory /usr/sap/trans and /sapdump
+        - name: Create shared directory /usr/sap/trans and /media/sap
           ansible.builtin.file:
             path: '{{ item }}'
             state: directory
             mode: '0775'
           loop:
             - /usr/sap/trans
-            - /sapdump
+            - /media/sap
 
         # Mount logical SAP volumes
         - name: Mount ANF NFS on /usr/sap/trans
@@ -30,10 +30,10 @@
             fstype: nfs
             state: mounted
 
-        - name: Mount ANF NFS on /sapdump
+        - name: Mount ANF NFS on /media/sap
           ansible.posix.mount:
-            path: /sapdump
-            src: '{{ sap_anf_shared_sapdump }}'
+            path: /media/sap
+            src: '{{ sap_anf_shared_sapmedia }}'
             opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
