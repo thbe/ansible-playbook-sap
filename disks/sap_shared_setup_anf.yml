@@ -44,3 +44,6 @@
         - ansible_facts['distribution'] == "RedHat"
         - sap_ha|bool == false
         - sap_anf|bool == true
+        - sap_instance_type != 'Router'
+        - sap_instance_type != 'Webdispatcher'
+        - sap_instance_type != 'HANA'
