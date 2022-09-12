@@ -31,7 +31,7 @@
         - name: Mount ANF NFS on /usr/sap/SID
           ansible.posix.mount:
             path: '/usr/sap/{{ sap_instance_sid }}'
-            src: '{{ sap_anf_netweaver_usrsap }}'
+            src: '{{ sap_anf_netweaver_sapusr }}'
             opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
