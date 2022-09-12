@@ -20,17 +20,17 @@
             - /usr/sap
 
         # Mount logical SAP volumes
-        - name: Mount ANF NFS on /sapmnt
+        - name: Mount ANF NFS on /sapmnt/SID
           ansible.posix.mount:
-            path: /sapmnt
+            path: '/sapmnt/{{ sap_instance_sid }}'
             src: '{{ sap_anf_netweaver_sapmnt }}'
             opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
 
-        - name: Mount ANF NFS on /usr/sap
+        - name: Mount ANF NFS on /usr/sap/SID
           ansible.posix.mount:
-            path: /usr/sap
+            path: '/usr/sap/{{ sap_instance_sid }}'
             src: '{{ sap_anf_netweaver_usrsap }}'
             opts: '{{ sap_anf_options }}'
             fstype: nfs

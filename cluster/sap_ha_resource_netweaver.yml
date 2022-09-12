@@ -21,7 +21,7 @@
         # Ensure properties are set correctly
         - name: Ensure Pacemaker stickiness is configured properly
           ansible.builtin.command:
-            cmd: "/usr/sbin/pcs resource defaults resource-stickiness=1000"
+            cmd: "/usr/sbin/pcs resource defaults resource-stickiness=1"
           register: sap_ha_cluster_resource_config
           changed_when: "'Defaults do not apply to resource' in sap_ha_cluster_resource_config.stdout"
           when:
@@ -29,13 +29,62 @@
 
         - name: Ensure Pacemaker migration threshold is configured properly
           ansible.builtin.command:
-            cmd: "/usr/sbin/pcs resource defaults migration-threshold=5000"
+            cmd: "/usr/sbin/pcs resource defaults migration-threshold=3"
           register: sap_ha_cluster_resource_config
           changed_when: "'Defaults do not apply to resource' in sap_ha_cluster_resource_config.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
 
-        # Create SAP HANA cluster resources
+        # Create SAP Netweaver cluster resources
+        - name: Set second node as standby
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs node standby {{ sap_ha_secondary }}
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Create SAP Netweaver file resource
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create fs_{{ sap_instance_sid }}_ASCS device='192.168.24.5:/sapQAS/usrsapQASascs' \
+              directory='/usr/sap/{{ sap_instance_sid }}/ASCS{{ sap_instance_number }}' fstype='nfs' \
+              force_unmount=safe options='{{ sap_anf_options }}' \
+              op start interval=0 timeout=60 op stop interval=0 timeout=120 \
+              op monitor interval=200 timeout=105 \
+              --group g-{{ sap_instance_sid }}_ASCS
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Create primary virtual IP resource
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create vip_{{ sap_instance_sid }}_ASCS \
+              IPaddr2 ip="{{ sap_ha_vip_primary }}" cidr_netmask={{ sap_ha_vcidr_primary }} op monitor interval=30s
+              --group g-{{ sap_instance_sid }}_ASCS
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Create primary LB resource
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create nc_{{ sap_instance_sid }}_ASCS azure-lb port=62000 \
+              --group g-{{ sap_instance_sid }}_ASCS
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+
+
+
+
+
         - name: Create SAP HANA topology
           ansible.builtin.shell:
             cmd: |
@@ -344,4 +393,4 @@
 
       when:
         - sap_ha|bool == true
-        - sap_instance_product == "HANA"
+        - sap_instance_type == "ASCS"

@@ -18,9 +18,9 @@
             state: directory
             mode: '0775'
           when:
-            - sap_instance_type != 'Router'
-            - sap_instance_type != 'Webdispatcher'
-            - sap_instance_type != 'HANA'
+            - sap_instance_type != "Router"
+            - sap_instance_type != "Webdispatcher"
+            - sap_instance_type != "DB"
 
         - name: Create shared directory /media/sap
           ansible.builtin.file:
@@ -37,9 +37,9 @@
             fstype: nfs
             state: mounted
           when:
-            - sap_instance_type != 'Router'
-            - sap_instance_type != 'Webdispatcher'
-            - sap_instance_type != 'HANA'
+            - sap_instance_type != "Router"
+            - sap_instance_type != "Webdispatcher"
+            - sap_instance_type != "DB
 
         - name: Mount ANF NFS on /media/sap
           ansible.posix.mount:
