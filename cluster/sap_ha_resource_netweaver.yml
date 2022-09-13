@@ -66,7 +66,7 @@
             cmd: |
               /usr/sbin/pcs resource create vip_{{ sap_instance_sid }}_ASCS \
               IPaddr2 ip="{{ sap_ha_vip_primary }}" cidr_netmask={{ sap_ha_vcidr_primary }} \
-              op monitor interval=30s
+              op monitor interval=30s \
               --group g-{{ sap_instance_sid }}_ASCS
           register: sap_ha_cluster_resource_create
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
@@ -122,7 +122,7 @@
             cmd: |
               /usr/sbin/pcs resource create vip_{{ sap_instance_sid }}_AERS \
               IPaddr2 ip="{{ sap_ha_vip_secondary }}" cidr_netmask={{ sap_ha_vcidr_secondary }} \
-              op monitor interval=30s
+              op monitor interval=30s \
               --group g-{{ sap_instance_sid }}_AERS
           register: sap_ha_cluster_resource_create
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
