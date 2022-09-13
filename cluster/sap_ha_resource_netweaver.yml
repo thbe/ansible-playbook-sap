@@ -49,8 +49,8 @@
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs resource create fs_{{ sap_instance_sid }}_ASCS \
-              Filesystem device='{{ sap_anf_netweaver_sapusr }}/ASCS{{ sap_instance_number }}' \
-              directory='/usr/sap/{{ sap_instance_sid }}/ASCS{{ sap_instance_number }}' \
+              Filesystem device='{{ sap_anf_netweaver_sapusr }}/ASCS00' \
+              directory='/usr/sap/{{ sap_instance_sid }}/ASCS00' \
               fstype='nfs' force_unmount=safe options='{{ sap_anf_options }}' \
               op start interval=0 timeout=60 \
               op stop interval=0 timeout=120 \
@@ -105,8 +105,8 @@
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs resource create fs_{{ sap_instance_sid }}_AERS \
-              Filesystem device='{{ sap_anf_netweaver_sapusr }}/ERS{{ sap_instance_number }}' \
-              directory='/usr/sap/{{ sap_instance_sid }}/ERS{{ sap_instance_number }}' \
+              Filesystem device='{{ sap_anf_netweaver_sapusr }}/ERS01' \
+              directory='/usr/sap/{{ sap_instance_sid }}/ERS01' \
               fstype='nfs' force_unmount=safe options='{{ sap_anf_options }}' \
               op start interval=0 timeout=60 \
               op stop interval=0 timeout=120 \
@@ -142,9 +142,9 @@
         - name: Create SAP ASCS instance
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_ASCS{{ sap_instance_number }} \
-              SAPInstance InstanceName={{ sap_instance_sid }}_ASCS00_anftstsapvh \
-              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_ASCS00_anftstsapvh" \
+              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_ASCS00 \
+              SAPInstance InstanceName={{ sap_instance_sid }}_ASCS00_{{ sap_alias }} \
+              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_ASCS00_{{ sap_alias }}" \
               AUTOMATIC_RECOVER=false \
               meta resource-stickiness=5000 \
               op start interval=0 timeout=600 \
@@ -168,9 +168,9 @@
         - name: Create SAP ERS instance
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_ERS{{ sap_instance_number }} \
-              SAPInstance InstanceName={{ sap_instance_sid }}_ERS01_anftstsapvh \
-              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_ERS01_anftstsapvh" \
+              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_ERS01 \
+              SAPInstance InstanceName={{ sap_instance_sid }}_ERS01_{{ sap_alias }} \
+              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_ERS01_{{ sap_alias }}" \
               AUTOMATIC_RECOVER=false IS_ERS=true \
               op start interval=0 timeout=600 \
               op stop interval=0 timeout=600 \
@@ -184,16 +184,42 @@
         - name: Create stickiness for ERS instance
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource meta rsc_sap_{{ sap_instance_sid }}_ERS{{ sap_instance_number }} \
+              /usr/sbin/pcs resource meta rsc_sap_{{ sap_instance_sid }}_ERS01 \
               resource-stickiness=3000
           register: sap_ha_cluster_resource_create
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
 
-# sudo pcs constraint colocation add g-QAS_AERS with g-QAS_ASCS -5000
-# sudo pcs constraint order start g-QAS_ASCS then start g-QAS_AERS kind=Optional symmetrical=false
-# sudo pcs constraint order start g-QAS_ASCS then stop g-QAS_AERS kind=Optional symmetrical=false
+        - name: Create ASCS and ERS colocation
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint colocation add g-{{ sap_instance_sid }}_AERS \
+              with g-{{ sap_instance_sid }}_ASCS -5000
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Set start order
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint order start g-{{ sap_instance_sid }}_ASCS \
+              then start g-{{ sap_instance_sid }}_AERS kind=Optional symmetrical=false
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Set start order
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint order start g-{{ sap_instance_sid }}_ASCS \
+              then stop g-{{ sap_instance_sid }}_AERS kind=Optional symmetrical=false
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
 
         - name: Activate first node
           ansible.builtin.command:
