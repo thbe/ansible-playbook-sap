@@ -10,7 +10,7 @@
     - name: Configure shared disks
       block:
         # Create SAP HANA mount points
-        - name: Create HANA directories /hana/shared, /hana/log, /hana/data and /hana/backup
+        - name: Create HANA directories /hana/shared, /hana/log and /hana/data
           ansible.builtin.file:
             path: '{{ item }}'
             state: directory
@@ -19,6 +19,15 @@
             - /hana/shared
             - /hana/log
             - /hana/data
+          when:
+            - sap_ha|bool == false
+
+        - name: Create HANA directory /hana/backup
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
             - /hana/backup
 
         # Mount logical SAP volumes
@@ -29,6 +38,8 @@
             opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
+          when:
+            - sap_ha|bool == false
 
         - name: Mount ANF NFS on /hana/log
           ansible.posix.mount:
@@ -37,6 +48,8 @@
             opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
+          when:
+            - sap_ha|bool == false
 
         - name: Mount ANF NFS on /hana/data
           ansible.posix.mount:
@@ -45,6 +58,8 @@
             opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
+          when:
+            - sap_ha|bool == false
 
         - name: Mount ANF NFS on /hana/backup
           ansible.posix.mount:
@@ -70,3 +85,4 @@
         - ansible_facts['distribution'] == "RedHat"
         - sap_ha|bool == false
         - sap_anf|bool == true
+        - sap_instance_type == "DB"
