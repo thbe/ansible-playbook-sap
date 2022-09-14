@@ -83,6 +83,5 @@
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
         - ansible_facts['product_name'] == "Virtual Machine"
         - ansible_facts['distribution'] == "RedHat"
-        - sap_ha|bool == false
         - sap_anf|bool == true
         - sap_instance_type == "DB"
