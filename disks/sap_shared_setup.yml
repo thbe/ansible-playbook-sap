@@ -38,7 +38,6 @@
         - name: Create shared directory /media/sap
           ansible.builtin.file:
             path: /media/sap
-            group: sapsys
             state: directory
             mode: '0775'
           when:
