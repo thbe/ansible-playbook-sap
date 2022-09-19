@@ -30,7 +30,7 @@
             state: directory
             mode: '0775'
           when:
-            - stat_result_saptrans.stat.exists
+            - stat_result_saptrans.stat.exists == false
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
@@ -42,7 +42,7 @@
             state: directory
             mode: '0775'
           when:
-            - stat_result_sapmedia.stat.exists
+            - stat_result_sapmedia.stat.exists == false
 
         # Mount logical SAP volumes
         - name: Mount ANF NFS on /usr/sap/trans
