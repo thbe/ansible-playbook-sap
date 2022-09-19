@@ -3,33 +3,49 @@
   become: true
   become_user: root
 
+  vars:
+    sap_anf_options: 'rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys'
+    sap_anf_shared_saptrans: '10.242.91.139:/Global-saptrans'
+    sap_anf_shared_sapmedia: '10.242.90.132:/sapdump'
+
   tasks:
-    - name: Configure shared disk
+    - name: Configure shared disks
       block:
         # Create SAP mount points
-        - name: Create shared directory /usr/sap/trans and /sapdump
+        - name: Create shared directory /usr/sap/trans
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: /usr/sap/trans
             state: directory
             mode: '0775'
-          loop:
-            - /usr/sap/trans
-            - /sapdump
+          when:
+            - sap_instance_type != "Router"
+            - sap_instance_type != "Webdispatcher"
+            - sap_instance_type != "DB"
+
+        - name: Create shared directory /media/sap
+          ansible.builtin.file:
+            path: /media/sap
+            state: directory
+            mode: '0775'
 
         # Mount logical SAP volumes
-        - name: mount NFS on /usr/sap/trans
+        - name: Mount ANF NFS on /usr/sap/trans
           ansible.posix.mount:
             path: /usr/sap/trans
-            src: 10.242.90.74:/sapstr03/saptrans
-            opts: auto,nofail,noatime,nolock,intr,tcp,actimeo=1800
+            src: '{{ sap_anf_shared_saptrans }}'
+            opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
+          when:
+            - sap_instance_type != "Router"
+            - sap_instance_type != "Webdispatcher"
+            - sap_instance_type != "DB"
 
-        - name: mount NFS on /sapdump
+        - name: Mount ANF NFS on /media/sap
           ansible.posix.mount:
-            path: /sapdump
-            src: 10.242.90.132:/sapdump
-            opts: auto,nofail,noatime,nolock,intr,tcp,actimeo=1800
+            path: /media/sap
+            src: '{{ sap_anf_shared_sapmedia }}'
+            opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
 
