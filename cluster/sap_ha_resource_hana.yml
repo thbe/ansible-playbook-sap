@@ -39,8 +39,8 @@
         - name: Create SAP HANA topology
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource create SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }} \
-              SAPHanaTopology SID={{ sap_instance_sid }} InstanceNumber={{ sap_instance_number }} \
+              /usr/sbin/pcs resource create SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }} \
+              SAPHanaTopology SID={{ sap_instance_sid }} InstanceNumber={{ sap_ha_hana_instance_number }} \
               op start timeout=600 \
               op stop timeout=300 \
               op monitor interval=10 timeout=600 \
@@ -53,8 +53,8 @@
         - name: Create SAP HANA resource agent
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource create SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }} \
-              SAPHana SID={{ sap_instance_sid }} InstanceNumber={{ sap_instance_number }} \
+              /usr/sbin/pcs resource create SAPHana_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }} \
+              SAPHana SID={{ sap_instance_sid }} InstanceNumber={{ sap_ha_hana_instance_number }} \
               PREFER_SITE_TAKEOVER=true DUPLICATE_PRIMARY_TIMEOUT=7200 AUTOMATED_REGISTER=false \
               op start timeout=3600 op stop timeout=3600 \
               op monitor interval=61 role="Slave" timeout=700 \
@@ -69,7 +69,7 @@
         - name: Create virtual IP resource
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource create vip_{{ sap_instance_sid }}_{{ sap_instance_number }}_primary \
+              /usr/sbin/pcs resource create vip_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}_primary \
               IPaddr2 ip="{{ sap_ha_vip_primary }}" cidr_netmask={{ sap_ha_vcidr_primary }} op monitor interval=30s
           register: sap_ha_cluster_resource_create
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
@@ -79,8 +79,8 @@
         - name: Create Cluster constraint
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs constraint order SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone  \
-              then SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone symmetrical=false
+              /usr/sbin/pcs constraint order SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}-clone  \
+              then SAPHana_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}-clone symmetrical=false
           register: sap_ha_cluster_constraint_create
           changed_when: "'Adding SAPHanaTopology' in sap_ha_cluster_constraint_create.stdout"
           when:
@@ -89,8 +89,8 @@
         - name: Colocate Cluster constraint
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs constraint colocation add vip_{{ sap_instance_sid }}_{{ sap_instance_number }}_primary \
-              with master SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone 4000
+              /usr/sbin/pcs constraint colocation add vip_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}_primary \
+              with master SAPHana_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}-clone 4000
           register: sap_ha_cluster_constraint_colocate
           changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
           when:
@@ -99,7 +99,7 @@
         - name: Create virtual IP resource for Active/Read-Enabled HANA on the secondary node
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource create vip_{{ sap_instance_sid }}_{{ sap_instance_number }}_secondary \
+              /usr/sbin/pcs resource create vip_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}_secondary \
               IPaddr2 ip="{{ sap_ha_vip_secondary }}" cidr_netmask={{ sap_ha_vcidr_secondary }} op monitor interval=30s
           register: sap_ha_cluster_resource_create
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
@@ -109,8 +109,8 @@
         - name: Colocate Cluster constrain for Active/Read-Enabled HANA on the secondary node
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs constraint colocation add vip_{{ sap_instance_sid }}_{{ sap_instance_number }}_secondary \
-              with slave SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone 4000
+              /usr/sbin/pcs constraint colocation add vip_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}_secondary \
+              with slave SAPHana_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}-clone 4000
           register: sap_ha_cluster_constraint_colocate
           changed_when: "'error' not in sap_ha_cluster_constraint_colocate.stdout"
           when:
@@ -303,7 +303,7 @@
         - name: Configure order constraints on secondary node
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs constraint location SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone \
+              /usr/sbin/pcs constraint location SAPHanaTopology_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}-clone \
               rule score=-INFINITY {{ sap_instance_sid }}_hana_nfs_primary_active ne true \
               and {{ sap_instance_sid }}_hana_nfs_secondary_active ne true
           register: sap_ha_cluster_constraint_order
@@ -315,7 +315,7 @@
         - name: Configure order constraints on secondary node
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs constraint location SAPHana_{{ sap_instance_sid }}_{{ sap_instance_number }}-clone \
+              /usr/sbin/pcs constraint location SAPHana_{{ sap_instance_sid }}_{{ sap_ha_hana_instance_number }}-clone \
               rule score=-INFINITY {{ sap_instance_sid }}_hana_nfs_primary_active ne true \
               and {{ sap_instance_sid }}_hana_nfs_secondary_active ne true
           register: sap_ha_cluster_constraint_order

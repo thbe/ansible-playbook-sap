@@ -3,6 +3,9 @@
   become: true
   become_user: root
 
+  vars:
+    sap_anf_options: 'rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys'
+
   tasks:
     # Install parted
     - name: Install parted
@@ -40,8 +43,8 @@
       ansible.builtin.stat:
         path: /dev/disk/azure/scsi1/lun6
       register: stat_result_lun6
-    
-    - name: Configure HANA disks
+
+    - name: Configure local HANA disks
       block:
         # Setup disk layout for HANA system
         - name: Use remaining disk space for LVM
@@ -74,7 +77,7 @@
           loop:
             - hanasharedlv
             - hanaloglv
-        
+
         - name: Create 512G logical volume hanadatalv in volume group hanavg
           community.general.lvol:
             vg: hanavg
@@ -136,3 +139,84 @@
         - stat_result_lun4.stat.exists
         - stat_result_lun5.stat.exists
         - stat_result_lun6.stat.exists
+        - sap_anf|bool == false
+        - sap_instance_type == "DB"
+
+    - name: Configure ANF HANA disks
+      block:
+        # Create SAP HANA mount points
+        - name: Create HANA directories /hana/shared, /hana/log and /hana/data
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /hana/shared
+            - /hana/log
+            - /hana/data
+          when:
+            - sap_ha|bool == false
+
+        - name: Create HANA directory /hana/backup
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /hana/backup
+
+        # Mount logical SAP volumes
+        - name: Mount ANF NFS on /hana/shared
+          ansible.posix.mount:
+            path: /hana/shared
+            src: '{{ sap_anf_hana_shared }}'
+            opts: '{{ sap_anf_options }}'
+            fstype: nfs
+            state: mounted
+          when:
+            - sap_ha|bool == false
+
+        - name: Mount ANF NFS on /hana/log
+          ansible.posix.mount:
+            path: /hana/log
+            src: '{{ sap_anf_hana_log }}'
+            opts: '{{ sap_anf_options }}'
+            fstype: nfs
+            state: mounted
+          when:
+            - sap_ha|bool == false
+
+        - name: Mount ANF NFS on /hana/data
+          ansible.posix.mount:
+            path: /hana/data
+            src: '{{ sap_anf_hana_data }}'
+            opts: '{{ sap_anf_options }}'
+            fstype: nfs
+            state: mounted
+          when:
+            - sap_ha|bool == false
+
+        - name: Mount ANF NFS on /hana/backup
+          ansible.posix.mount:
+            path: /hana/backup
+            src: '{{ sap_anf_hana_backup }}'
+            opts: '{{ sap_anf_options }}'
+            fstype: nfs
+            state: mounted
+
+        # Create backup directories for log and data
+        - name: Create HANA directories /hana/backup/log and /hana/backup/data
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - /hana/backup/log
+            - /hana/backup/data
+
+      when:
+        - ansible_facts['system_vendor'] == "Microsoft Corporation"
+        - ansible_facts['product_name'] == "Virtual Machine"
+        - ansible_facts['distribution'] == "RedHat"
+        - sap_anf|bool == true
+        - sap_instance_type == "DB"

@@ -7,7 +7,7 @@
     sap_anf_options: 'rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys'
 
   tasks:
-    - name: Configure SAP HANA cluster
+    - name: Configure SAP Netweaver cluster
       block:
         # Ensure that the cluster is in maintenance mode
         - name: Ensure Cluster is in maintenance mode
@@ -45,12 +45,12 @@
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
 
-        - name: Create SAP Netweaver file resource
+        - name: Create ASCS file resource
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs resource create fs_{{ sap_instance_sid }}_ASCS \
-              Filesystem device='{{ sap_anf_netweaver_sapusr }}/ASCS00' \
-              directory='/usr/sap/{{ sap_instance_sid }}/ASCS00' \
+              Filesystem device='{{ sap_anf_netweaver_sapusr }}/ASCS{{ sap_ha_ascs_instance_number }}' \
+              directory='/usr/sap/{{ sap_instance_sid }}/ASCS{{ sap_ha_ascs_instance_number }}' \
               fstype='nfs' force_unmount=safe options='{{ sap_anf_options }}' \
               op start interval=0 timeout=60 \
               op stop interval=0 timeout=120 \
@@ -60,8 +60,26 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_ascs_instance_number is defined
 
-        - name: Create ASCS virtual IP resource
+        - name: Create SCS file resource
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create fs_{{ sap_instance_sid }}_SCS \
+              Filesystem device='{{ sap_anf_netweaver_sapusr }}/SCS{{ sap_ha_scs_instance_number }}' \
+              directory='/usr/sap/{{ sap_instance_sid }}/SCS{{ sap_ha_scs_instance_number }}' \
+              fstype='nfs' force_unmount=safe options='{{ sap_anf_options }}' \
+              op start interval=0 timeout=60 \
+              op stop interval=0 timeout=120 \
+              op monitor interval=200 timeout=105 \
+              --group g-{{ sap_instance_sid }}_ASCS
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_scs_instance_number is defined
+
+        - name: Create (A)SCS virtual IP resource
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs resource create vip_{{ sap_instance_sid }}_ASCS \
@@ -73,7 +91,7 @@
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
 
-        - name: Create ASCS LB resource
+        - name: Create (A)SCS LB resource
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs resource create nc_{{ sap_instance_sid }}_ASCS azure-lb port=62000 \
