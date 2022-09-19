@@ -119,12 +119,12 @@
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
 
-        - name: Create SAP Netweaver file resource
+        - name: Create AERS file resource
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs resource create fs_{{ sap_instance_sid }}_AERS \
-              Filesystem device='{{ sap_anf_netweaver_sapusr }}/ERS01' \
-              directory='/usr/sap/{{ sap_instance_sid }}/ERS01' \
+              Filesystem device='{{ sap_anf_netweaver_sapusr }}/ERS{{ sap_ha_aers_instance_number }}' \
+              directory='/usr/sap/{{ sap_instance_sid }}/ERS{{ sap_ha_aers_instance_number }}' \
               fstype='nfs' force_unmount=safe options='{{ sap_anf_options }}' \
               op start interval=0 timeout=60 \
               op stop interval=0 timeout=120 \
@@ -134,6 +134,24 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_aers_instance_number is defined
+
+        - name: Create ERS file resource
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create fs_{{ sap_instance_sid }}_ERS \
+              Filesystem device='{{ sap_anf_netweaver_sapusr }}/ERS{{ sap_ha_ers_instance_number }}' \
+              directory='/usr/sap/{{ sap_instance_sid }}/ERS{{ sap_ha_ers_instance_number }}' \
+              fstype='nfs' force_unmount=safe options='{{ sap_anf_options }}' \
+              op start interval=0 timeout=60 \
+              op stop interval=0 timeout=120 \
+              op monitor interval=200 timeout=105 \
+              --group g-{{ sap_instance_sid }}_AERS
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_ers_instance_number is defined
 
         - name: Create ERS virtual IP resource
           ansible.builtin.shell:
@@ -160,9 +178,9 @@
         - name: Create SAP ASCS instance
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_ASCS00 \
-              SAPInstance InstanceName={{ sap_instance_sid }}_ASCS00_{{ sap_alias }} \
-              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_ASCS00_{{ sap_alias }}" \
+              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_ASCS{{ sap_ha_ascs_instance_number }} \
+              SAPInstance InstanceName={{ sap_instance_sid }}_ASCS{{ sap_ha_ascs_instance_number }}_{{ sap_alias }} \
+              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_ASCS{{ sap_ha_ascs_instance_number }}_{{ sap_alias }}" \
               AUTOMATIC_RECOVER=false \
               meta resource-stickiness=5000 \
               op start interval=0 timeout=600 \
@@ -173,6 +191,25 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_ascs_instance_number is defined
+
+        - name: Create SAP SCS instance
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_SCS{{ sap_ha_scs_instance_number }} \
+              SAPInstance InstanceName={{ sap_instance_sid }}_SCS{{ sap_ha_scs_instance_number }}_{{ sap_alias }} \
+              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_SCS{{ sap_ha_scs_instance_number }}_{{ sap_alias }}" \
+              AUTOMATIC_RECOVER=false \
+              meta resource-stickiness=5000 \
+              op start interval=0 timeout=600 \
+              op stop interval=0 timeout=600 \
+              op monitor interval=20 on-fail=restart timeout=105 \
+              --group g-{{ sap_instance_sid }}_ASCS
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_scs_instance_number is defined
 
         - name: Create stickiness for ASCS group
           ansible.builtin.shell:
@@ -183,12 +220,12 @@
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
 
-        - name: Create SAP ERS instance
+        - name: Create SAP AERS instance
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_ERS01 \
-              SAPInstance InstanceName={{ sap_instance_sid }}_ERS01_{{ sap_alias }} \
-              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_ERS01_{{ sap_alias }}" \
+              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_ERS{{ sap_ha_aers_instance_number }} \
+              SAPInstance InstanceName={{ sap_instance_sid }}_ERS{{ sap_ha_aers_instance_number }}_{{ sap_alias }} \
+              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_ERS{{ sap_ha_aers_instance_number }}_{{ sap_alias }}" \
               AUTOMATIC_RECOVER=false IS_ERS=true \
               op start interval=0 timeout=600 \
               op stop interval=0 timeout=600 \
@@ -198,6 +235,24 @@
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_aers_instance_number is defined
+
+        - name: Create SAP ERS instance
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource create rsc_sap_{{ sap_instance_sid }}_ERS{{ sap_ha_ers_instance_number }} \
+              SAPInstance InstanceName={{ sap_instance_sid }}_ERS{{ sap_ha_ers_instance_number }}_{{ sap_alias }} \
+              START_PROFILE="/sapmnt/{{ sap_instance_sid }}/profile/{{ sap_instance_sid }}_ERS{{ sap_ha_ers_instance_number }}_{{ sap_alias }}" \
+              AUTOMATIC_RECOVER=false IS_ERS=true \
+              op start interval=0 timeout=600 \
+              op stop interval=0 timeout=600 \
+              op monitor interval=20 on-fail=restart timeout=105 \
+              --group g-{{ sap_instance_sid }}_AERS
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_ers_instance_number is defined
 
         - name: Create stickiness for ERS instance
           ansible.builtin.shell:
