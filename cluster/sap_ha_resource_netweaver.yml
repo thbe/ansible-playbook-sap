@@ -254,15 +254,27 @@
             - ansible_facts['fqdn'] == sap_ha_primary
             - sap_ha_ers_instance_number is defined
 
-        - name: Create stickiness for ERS instance
+        - name: Create stickiness for AERS instance
           ansible.builtin.shell:
             cmd: |
-              /usr/sbin/pcs resource meta rsc_sap_{{ sap_instance_sid }}_ERS01 \
+              /usr/sbin/pcs resource meta rsc_sap_{{ sap_instance_sid }}_ERS{{ sap_ha_aers_instance_number }} \
               resource-stickiness=3000
           register: sap_ha_cluster_resource_create
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_aers_instance_number is defined
+
+        - name: Create stickiness for ERS instance
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs resource meta rsc_sap_{{ sap_instance_sid }}_ERS{{ sap_ha_ers_instance_number }} \
+              resource-stickiness=3000
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+            - sap_ha_ers_instance_number is defined
 
         - name: Create ASCS and ERS colocation
           ansible.builtin.shell:
