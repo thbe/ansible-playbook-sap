@@ -118,7 +118,7 @@
     - name: Configure ANF SAP Netweaver disks
       block:
         # Create SAP mount points
-        - name: Create SAP directory /sapmnt/SID
+        - name: Create SAP directory /sapmnt/SID for ABAP
           ansible.builtin.file:
             path: '{{ item }}'
             state: directory
@@ -126,8 +126,18 @@
           loop:
             - '/sapmnt/{{ sap_instance_sid }}'
 
+        - name: Create SAP directory /sapmnt/SID for JAVA
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - '/sapmnt/{{ sap_instance_java_sid }}'
+          when:
+            - sap_instance_java_sid is defined
+
         # Mount logical SAP volumes
-        - name: Mount ANF NFS on /sapmnt/SID
+        - name: Mount ANF NFS on /sapmnt/SID for ABAP
           ansible.posix.mount:
             path: '/sapmnt/{{ sap_instance_sid }}'
             src: '{{ sap_anf_netweaver_sapmnt }}'
@@ -135,8 +145,18 @@
             fstype: nfs
             state: mounted
 
+        - name: Mount ANF NFS on /sapmnt/SID for JAVA
+          ansible.posix.mount:
+            path: '/sapmnt/{{ sap_instance_java_sid }}'
+            src: '{{ sap_anf_netweaver_sapmnt }}'
+            opts: '{{ sap_anf_options }}'
+            fstype: nfs
+            state: mounted
+          when:
+            - sap_instance_java_sid is defined
+
         # Create SAP mount points
-        - name: Create SAP directory /usr/sap/SID/SYS
+        - name: Create SAP directory /usr/sap/SID/SYS for ABAP
           ansible.builtin.file:
             path: '{{ item }}'
             state: directory
@@ -146,8 +166,19 @@
           when:
             - sap_instance_type == "ASCS"
 
+        - name: Create SAP directory /usr/sap/SID/SYS for JAVA
+          ansible.builtin.file:
+            path: '{{ item }}'
+            state: directory
+            mode: '0775'
+          loop:
+            - '/usr/sap/{{ sap_instance_java_sid }}/SYS'
+          when:
+            - sap_instance_type == "ASCS"
+            - sap_instance_java_sid is defined
+
         # Mount logical SAP volumes
-        - name: Mount ANF NFS on /usr/sap/SID/SYS
+        - name: Mount ANF NFS on /usr/sap/SID/SYS for ABAP
           ansible.posix.mount:
             path: '/usr/sap/{{ sap_instance_sid }}/SYS'
             src: '{{ sap_anf_netweaver_sapusr }}'
@@ -156,6 +187,17 @@
             state: mounted
           when:
             - sap_instance_type == "ASCS"
+
+        - name: Mount ANF NFS on /usr/sap/SID/SYS for JAVA
+          ansible.posix.mount:
+            path: '/usr/sap/{{ sap_instance_java_sid }}/SYS'
+            src: '{{ sap_anf_netweaver_sapusr }}'
+            opts: '{{ sap_anf_options }}'
+            fstype: nfs
+            state: mounted
+          when:
+            - sap_instance_type == "ASCS"
+            - sap_instance_java_sid is defined
 
       when:
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
