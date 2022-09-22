@@ -148,7 +148,7 @@
         - name: Mount ANF NFS on /sapmnt/SID for JAVA
           ansible.posix.mount:
             path: '/sapmnt/{{ sap_instance_java_sid }}'
-            src: '{{ sap_anf_netweaver_sapmnt }}'
+            src: '{{ sap_anf_netweaver_java_sapmnt }}'
             opts: '{{ sap_anf_options }}'
             fstype: nfs
             state: mounted
