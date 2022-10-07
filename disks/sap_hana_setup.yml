@@ -4,7 +4,7 @@
   become_user: root
 
   vars:
-    sap_anf_options: 'rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys,suid'
+    sap_anf_options: "rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys,suid"
 
   tasks:
     # Install parted
@@ -49,9 +49,9 @@
         # Setup disk layout for HANA system
         - name: Use remaining disk space for LVM
           ansible.builtin.parted:
-            device: '{{ item }}'
+            device: "{{ item }}"
             number: 1
-            flags: [ lvm ]
+            flags: [lvm]
             state: present
           loop:
             - /dev/disk/azure/scsi1/lun1
@@ -71,8 +71,8 @@
         - name: Create 144G logical volume hanasharedlv and hanaloglv in volume group hanavg
           community.general.lvol:
             vg: hanavg
-            lv: '{{ item }}'
-            opts: '-i 6'
+            lv: "{{ item }}"
+            opts: "-i 6"
             size: 144g
           loop:
             - hanasharedlv
@@ -82,7 +82,7 @@
           community.general.lvol:
             vg: hanavg
             lv: hanadatalv
-            opts: '-i 6'
+            opts: "-i 6"
             size: 512g
 
         # Format logical HANA DB volumes
@@ -90,7 +90,7 @@
           community.general.filesystem:
             fstype: xfs
             state: present
-            dev: '{{ item }}'
+            dev: "{{ item }}"
           loop:
             - /dev/hanavg/hanasharedlv
             - /dev/hanavg/hanaloglv
@@ -99,9 +99,9 @@
         # Create HANA mount points
         - name: Create SAP directory /hana/shared, /hana/log and /hana/data
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
             - /hana/shared
             - /hana/log
@@ -147,9 +147,9 @@
         # Create SAP HANA mount points
         - name: Create HANA directories /hana/shared, /hana/log and /hana/data
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
             - /hana/shared
             - /hana/log
@@ -159,9 +159,9 @@
 
         - name: Create HANA directory /hana/backup
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
             - /hana/backup
 
@@ -169,8 +169,8 @@
         - name: Mount ANF NFS on /hana/shared
           ansible.posix.mount:
             path: /hana/shared
-            src: '{{ sap_anf_hana_shared }}'
-            opts: '{{ sap_anf_options }}'
+            src: "{{ sap_anf_hana_shared }}"
+            opts: "{{ sap_anf_options }}"
             fstype: nfs
             state: mounted
           when:
@@ -179,8 +179,8 @@
         - name: Mount ANF NFS on /hana/log
           ansible.posix.mount:
             path: /hana/log
-            src: '{{ sap_anf_hana_log }}'
-            opts: '{{ sap_anf_options }}'
+            src: "{{ sap_anf_hana_log }}"
+            opts: "{{ sap_anf_options }}"
             fstype: nfs
             state: mounted
           when:
@@ -189,8 +189,8 @@
         - name: Mount ANF NFS on /hana/data
           ansible.posix.mount:
             path: /hana/data
-            src: '{{ sap_anf_hana_data }}'
-            opts: '{{ sap_anf_options }}'
+            src: "{{ sap_anf_hana_data }}"
+            opts: "{{ sap_anf_options }}"
             fstype: nfs
             state: mounted
           when:
@@ -199,17 +199,17 @@
         - name: Mount ANF NFS on /hana/backup
           ansible.posix.mount:
             path: /hana/backup
-            src: '{{ sap_anf_hana_backup }}'
-            opts: '{{ sap_anf_options }}'
+            src: "{{ sap_anf_hana_backup }}"
+            opts: "{{ sap_anf_options }}"
             fstype: nfs
             state: mounted
 
         # Create backup directories for log and data
         - name: Create HANA directories /hana/backup/log and /hana/backup/data
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
             - /hana/backup/log
             - /hana/backup/data

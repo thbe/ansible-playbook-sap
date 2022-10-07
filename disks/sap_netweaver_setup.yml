@@ -4,7 +4,7 @@
   become_user: root
 
   vars:
-    sap_anf_options: 'rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys'
+    sap_anf_options: "rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys,suid"
 
   tasks:
     # Install parted
@@ -24,9 +24,9 @@
         # Setup disk layout for sap system
         - name: Use all disk space on /dev/disk/azure/scsi1/lun0 for LVM
           ansible.builtin.parted:
-            device: '/dev/disk/azure/scsi1/lun0'
+            device: "/dev/disk/azure/scsi1/lun0"
             number: 1
-            flags: [ lvm ]
+            flags: [lvm]
             state: present
 
         # Setup volume group for SAP
@@ -39,7 +39,7 @@
         - name: Create 48G logical volume usrsaplv in volume group sapvg (SAP)
           community.general.lvol:
             vg: sapvg
-            lv: '{{ item }}'
+            lv: "{{ item }}"
             size: 48g
           loop:
             - usrsaplv
@@ -47,7 +47,7 @@
         - name: Create 48G logical volume sapmntlv in volume group sapvg (SAP)
           community.general.lvol:
             vg: sapvg
-            lv: '{{ item }}'
+            lv: "{{ item }}"
             size: 48g
           loop:
             - sapmntlv
@@ -59,7 +59,7 @@
           community.general.filesystem:
             fstype: xfs
             state: present
-            dev: '{{ item }}'
+            dev: "{{ item }}"
           loop:
             - /dev/sapvg/usrsaplv
 
@@ -67,7 +67,7 @@
           community.general.filesystem:
             fstype: xfs
             state: present
-            dev: '{{ item }}'
+            dev: "{{ item }}"
           loop:
             - /dev/sapvg/sapmntlv
           when:
@@ -76,17 +76,17 @@
         # Create SAP mount points
         - name: Create SAP directory /sapmnt
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
             - /usr/sap
 
         - name: Create SAP directory /sapmnt
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
             - /sapmnt
           when:
@@ -120,36 +120,36 @@
         # Create SAP mount points
         - name: Create SAP directory /sapmnt/SID for ABAP
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
-            - '/sapmnt/{{ sap_instance_sid }}'
+            - "/sapmnt/{{ sap_instance_sid }}"
 
         - name: Create SAP directory /sapmnt/SID for JAVA
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
-            - '/sapmnt/{{ sap_instance_java_sid }}'
+            - "/sapmnt/{{ sap_instance_java_sid }}"
           when:
             - sap_instance_java_sid is defined
 
         # Mount logical SAP volumes
         - name: Mount ANF NFS on /sapmnt/SID for ABAP
           ansible.posix.mount:
-            path: '/sapmnt/{{ sap_instance_sid }}'
-            src: '{{ sap_anf_netweaver_sapmnt }}'
-            opts: '{{ sap_anf_options }}'
+            path: "/sapmnt/{{ sap_instance_sid }}"
+            src: "{{ sap_anf_netweaver_sapmnt }}"
+            opts: "{{ sap_anf_options }}"
             fstype: nfs
             state: mounted
 
         - name: Mount ANF NFS on /sapmnt/SID for JAVA
           ansible.posix.mount:
-            path: '/sapmnt/{{ sap_instance_java_sid }}'
-            src: '{{ sap_anf_netweaver_java_sapmnt }}'
-            opts: '{{ sap_anf_options }}'
+            path: "/sapmnt/{{ sap_instance_java_sid }}"
+            src: "{{ sap_anf_netweaver_java_sapmnt }}"
+            opts: "{{ sap_anf_options }}"
             fstype: nfs
             state: mounted
           when:
@@ -158,21 +158,21 @@
         # Create SAP mount points
         - name: Create SAP directory /usr/sap/SID/SYS for ABAP
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
-            - '/usr/sap/{{ sap_instance_sid }}/SYS'
+            - "/usr/sap/{{ sap_instance_sid }}/SYS"
           when:
             - sap_instance_type == "ASCS"
 
         - name: Create SAP directory /usr/sap/SID/SYS for JAVA
           ansible.builtin.file:
-            path: '{{ item }}'
+            path: "{{ item }}"
             state: directory
-            mode: '0775'
+            mode: "0775"
           loop:
-            - '/usr/sap/{{ sap_instance_java_sid }}/SYS'
+            - "/usr/sap/{{ sap_instance_java_sid }}/SYS"
           when:
             - sap_instance_type == "ASCS"
             - sap_instance_java_sid is defined
@@ -180,9 +180,9 @@
         # Mount logical SAP volumes
         - name: Mount ANF NFS on /usr/sap/SID/SYS for ABAP
           ansible.posix.mount:
-            path: '/usr/sap/{{ sap_instance_sid }}/SYS'
-            src: '{{ sap_anf_netweaver_sapusr }}'
-            opts: '{{ sap_anf_options }}'
+            path: "/usr/sap/{{ sap_instance_sid }}/SYS"
+            src: "{{ sap_anf_netweaver_sapusr }}"
+            opts: "{{ sap_anf_options }}"
             fstype: nfs
             state: mounted
           when:
@@ -190,9 +190,9 @@
 
         - name: Mount ANF NFS on /usr/sap/SID/SYS for JAVA
           ansible.posix.mount:
-            path: '/usr/sap/{{ sap_instance_java_sid }}/SYS'
-            src: '{{ sap_anf_netweaver_java_sapusr }}'
-            opts: '{{ sap_anf_options }}'
+            path: "/usr/sap/{{ sap_instance_java_sid }}/SYS"
+            src: "{{ sap_anf_netweaver_java_sapusr }}"
+            opts: "{{ sap_anf_options }}"
             fstype: nfs
             state: mounted
           when:
