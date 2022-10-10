@@ -27,8 +27,6 @@
           ansible.builtin.stat:
             path: "/itgdata/{{ sap_instance_sid }}"
           register: stat_result_itgdata
-          when:
-            - sap_instance_sid is defined
 
         # Create SAP mount points
         - name: Create shared directory /usr/sap/trans
@@ -58,7 +56,6 @@
             state: directory
             mode: "0775"
           when:
-            - sap_instance_sid is defined
             - stat_result_itgdata.stat.exists == false
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
@@ -96,9 +93,9 @@
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
-            - sap_instance_sid is defined
 
       when:
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
         - ansible_facts['product_name'] == "Virtual Machine"
         - ansible_facts['distribution'] == "RedHat"
+        - sap_instance_sid is defined
