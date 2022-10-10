@@ -85,7 +85,7 @@
         - name: Mount APF NFS on /itgdata/SID
           ansible.posix.mount:
             path: "/itgdata/{{ sap_instance_sid }}"
-            src: "{{ sap_apf_shared_itgdata }}"
+            src: "{{ sap_apf_shared_itgdata }}/{{ sap_instance_sid }}"
             opts: "{{ nfs_options }}"
             fstype: nfs
             state: mounted
