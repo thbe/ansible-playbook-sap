@@ -28,7 +28,7 @@
             path: "/itgdata/{{ sap_instance_sid }}"
           register: stat_result_itgdata
           when:
-            - sap_instance_sid
+            - sap_instance_sid is defined
 
         # Create SAP mount points
         - name: Create shared directory /usr/sap/trans
@@ -62,7 +62,7 @@
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
-            - sap_instance_sid
+            - sap_instance_sid is defined
 
         # Mount logical SAP volumes
         - name: Mount ANF NFS on /usr/sap/trans
@@ -96,7 +96,7 @@
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
-            - sap_instance_sid
+            - sap_instance_sid is defined
 
       when:
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
