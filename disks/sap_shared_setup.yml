@@ -27,6 +27,8 @@
           ansible.builtin.stat:
             path: "/itgdata/{{ sap_instance_sid }}"
           register: stat_result_itgdata
+          when:
+            - sap_instance_sid
 
         # Create SAP mount points
         - name: Create shared directory /usr/sap/trans
