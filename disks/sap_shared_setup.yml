@@ -58,11 +58,11 @@
             state: directory
             mode: "0775"
           when:
+            - sap_instance_sid is defined
             - stat_result_itgdata.stat.exists == false
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
-            - sap_instance_sid is defined
 
         # Mount logical SAP volumes
         - name: Mount ANF NFS on /usr/sap/trans
