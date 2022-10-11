@@ -52,7 +52,7 @@
           loop:
             - sapmntlv
           when:
-            - sap_anf|bool == false
+            - anf_storage|bool == false
 
         # Format logical SAP volumes
         - name: Create an xfs filesystem on /dev/sapvg/usrsaplv
@@ -71,7 +71,7 @@
           loop:
             - /dev/sapvg/sapmntlv
           when:
-            - sap_anf|bool == false
+            - anf_storage|bool == false
 
         # Create SAP mount points
         - name: Create SAP directory /sapmnt
@@ -90,7 +90,7 @@
           loop:
             - /sapmnt
           when:
-            - sap_anf|bool == false
+            - anf_storage|bool == false
 
         # Mount logical SAP volumes
         - name: mount the usrsaplv on /usr/sap
@@ -107,7 +107,7 @@
             fstype: xfs
             state: mounted
           when:
-            - sap_anf|bool == false
+            - anf_storage|bool == false
 
       when:
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
@@ -203,4 +203,4 @@
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
         - ansible_facts['product_name'] == "Virtual Machine"
         - ansible_facts['distribution'] == "RedHat"
-        - sap_anf|bool == true
+        - anf_storage
