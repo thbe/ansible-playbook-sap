@@ -133,14 +133,14 @@
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
         - ansible_facts['product_name'] == "Virtual Machine"
         - ansible_facts['distribution'] == "RedHat"
+        - sap_instance_type == "DB"
+        - anf_storage|bool == false
         - stat_result_lun1.stat.exists
         - stat_result_lun2.stat.exists
         - stat_result_lun3.stat.exists
         - stat_result_lun4.stat.exists
         - stat_result_lun5.stat.exists
         - stat_result_lun6.stat.exists
-        - sap_anf|bool == false
-        - sap_instance_type == "DB"
 
     - name: Configure ANF HANA disks
       block:
@@ -218,5 +218,5 @@
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
         - ansible_facts['product_name'] == "Virtual Machine"
         - ansible_facts['distribution'] == "RedHat"
-        - sap_anf|bool == true
         - sap_instance_type == "DB"
+        - anf_storage
