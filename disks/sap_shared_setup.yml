@@ -1,5 +1,6 @@
 ---
-- hosts: all
+- name: Configure Azure shared disks
+  hosts: all
   become: true
   become_user: root
 
@@ -11,8 +12,12 @@
 
   tasks:
     - name: Configure shared disks
+      when:
+        - ansible_facts['system_vendor'] == "Microsoft Corporation"
+        - ansible_facts['product_name'] == "Virtual Machine"
+        - ansible_facts['distribution'] == "RedHat"
+        - sap_instance_sid is defined
       block:
-        # Check if shared directories exist on local system
         - name: Check if /usr/sap/trans exists
           ansible.builtin.stat:
             path: /usr/sap/trans
@@ -28,7 +33,6 @@
             path: "/itgdata/{{ sap_instance_sid }}"
           register: stat_result_itgdata
 
-        # Create SAP mount points
         - name: Create shared directory /usr/sap/trans
           ansible.builtin.file:
             path: /usr/sap/trans
@@ -36,7 +40,7 @@
             state: directory
             mode: "0775"
           when:
-            - stat_result_saptrans.stat.exists == false
+            - not stat_result_saptrans.stat.exists
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
@@ -47,7 +51,7 @@
             state: directory
             mode: "0775"
           when:
-            - stat_result_sapmedia.stat.exists == false
+            - not stat_result_sapmedia.stat.exists
 
         - name: Create shared directory /itgdata/SID
           ansible.builtin.file:
@@ -56,12 +60,11 @@
             state: directory
             mode: "0775"
           when:
-            - stat_result_itgdata.stat.exists == false
+            - not stat_result_itgdata.stat.exists
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
 
-        # Mount logical SAP volumes
         - name: Mount ANF NFS on /usr/sap/trans
           ansible.posix.mount:
             path: /usr/sap/trans
@@ -93,9 +96,3 @@
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
-
-      when:
-        - ansible_facts['system_vendor'] == "Microsoft Corporation"
-        - ansible_facts['product_name'] == "Virtual Machine"
-        - ansible_facts['distribution'] == "RedHat"
-        - sap_instance_sid is defined

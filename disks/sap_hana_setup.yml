@@ -1,5 +1,6 @@
 ---
-- hosts: all
+- name: Configure Azure HANA disks
+  hosts: all
   become: true
   become_user: root
 
@@ -45,8 +46,19 @@
       register: stat_result_lun6
 
     - name: Configure local HANA disks
+      when:
+        - ansible_facts['system_vendor'] == "Microsoft Corporation"
+        - ansible_facts['product_name'] == "Virtual Machine"
+        - ansible_facts['distribution'] == "RedHat"
+        - sap_instance_type == "DB"
+        - not anf_storage
+        - stat_result_lun1.stat.exists
+        - stat_result_lun2.stat.exists
+        - stat_result_lun3.stat.exists
+        - stat_result_lun4.stat.exists
+        - stat_result_lun5.stat.exists
+        - stat_result_lun6.stat.exists
       block:
-        # Setup disk layout for HANA system
         - name: Use remaining disk space for LVM
           ansible.builtin.parted:
             device: "{{ item }}"
@@ -61,14 +73,12 @@
             - /dev/disk/azure/scsi1/lun5
             - /dev/disk/azure/scsi1/lun6
 
-        # Setup volume group hanavg for HANA DB
         - name: Create a HANA volume group on /dev/disk/azure/scsi1/lunX-part1
           community.general.lvg:
             vg: hanavg
             pvs: /dev/disk/azure/scsi1/lun1-part1,/dev/disk/azure/scsi1/lun2-part1,/dev/disk/azure/scsi1/lun3-part1,/dev/disk/azure/scsi1/lun4-part1,/dev/disk/azure/scsi1/lun5-part1,/dev/disk/azure/scsi1/lun6-part1
 
-        # Setup striped logical volumes for HANA DB
-        - name: Create 144G logical volume hanasharedlv and hanaloglv in volume group hanavg
+        - name: Create a striped 144G logical volume hanasharedlv and hanaloglv in volume group hanavg
           community.general.lvol:
             vg: hanavg
             lv: "{{ item }}"
@@ -85,7 +95,6 @@
             opts: "-i 6"
             size: 512g
 
-        # Format logical HANA DB volumes
         - name: Create an xfs filesystem on /dev/hanavg/hanasharedlv, /dev/hanavg/hanaloglv and /dev/hanavg/hanadatalv
           community.general.filesystem:
             fstype: xfs
@@ -96,7 +105,6 @@
             - /dev/hanavg/hanaloglv
             - /dev/hanavg/hanadatalv
 
-        # Create HANA mount points
         - name: Create SAP directory /hana/shared, /hana/log and /hana/data
           ansible.builtin.file:
             path: "{{ item }}"
@@ -107,44 +115,35 @@
             - /hana/log
             - /hana/data
 
-        # Mount logical HANA volumes
-        - name: mount the hanasharedlv on /hana/shared
+        - name: Mount the hanasharedlv on /hana/shared
           ansible.posix.mount:
             path: /hana/shared
             src: /dev/hanavg/hanasharedlv
             fstype: xfs
             state: mounted
 
-        - name: mount the hanaloglv on /hana/log
+        - name: Mount the hanaloglv on /hana/log
           ansible.posix.mount:
             path: /hana/log
             src: /dev/hanavg/hanaloglv
             fstype: xfs
             state: mounted
 
-        - name: mount the hanadatalv on /hana/data
+        - name: Mount the hanadatalv on /hana/data
           ansible.posix.mount:
             path: /hana/data
             src: /dev/hanavg/hanadatalv
             fstype: xfs
             state: mounted
 
+    - name: Configure ANF HANA disks
       when:
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
         - ansible_facts['product_name'] == "Virtual Machine"
         - ansible_facts['distribution'] == "RedHat"
         - sap_instance_type == "DB"
-        - anf_storage|bool == false
-        - stat_result_lun1.stat.exists
-        - stat_result_lun2.stat.exists
-        - stat_result_lun3.stat.exists
-        - stat_result_lun4.stat.exists
-        - stat_result_lun5.stat.exists
-        - stat_result_lun6.stat.exists
-
-    - name: Configure ANF HANA disks
+        - anf_storage
       block:
-        # Create SAP HANA mount points
         - name: Create HANA directories /hana/shared, /hana/log and /hana/data
           ansible.builtin.file:
             path: "{{ item }}"
@@ -155,7 +154,7 @@
             - /hana/log
             - /hana/data
           when:
-            - sap_ha|bool == false
+            - sap_ha
 
         - name: Create HANA directory /hana/backup
           ansible.builtin.file:
@@ -165,7 +164,6 @@
           loop:
             - /hana/backup
 
-        # Mount logical SAP volumes
         - name: Mount ANF NFS on /hana/shared
           ansible.posix.mount:
             path: /hana/shared
@@ -174,7 +172,7 @@
             fstype: nfs
             state: mounted
           when:
-            - sap_ha|bool == false
+            - sap_ha
 
         - name: Mount ANF NFS on /hana/log
           ansible.posix.mount:
@@ -184,7 +182,7 @@
             fstype: nfs
             state: mounted
           when:
-            - sap_ha|bool == false
+            - sap_ha
 
         - name: Mount ANF NFS on /hana/data
           ansible.posix.mount:
@@ -194,7 +192,7 @@
             fstype: nfs
             state: mounted
           when:
-            - sap_ha|bool == false
+            - sap_ha
 
         - name: Mount ANF NFS on /hana/backup
           ansible.posix.mount:
@@ -204,7 +202,6 @@
             fstype: nfs
             state: mounted
 
-        # Create backup directories for log and data
         - name: Create HANA directories /hana/backup/log and /hana/backup/data
           ansible.builtin.file:
             path: "{{ item }}"
@@ -213,10 +210,3 @@
           loop:
             - /hana/backup/log
             - /hana/backup/data
-
-      when:
-        - ansible_facts['system_vendor'] == "Microsoft Corporation"
-        - ansible_facts['product_name'] == "Virtual Machine"
-        - ansible_facts['distribution'] == "RedHat"
-        - sap_instance_type == "DB"
-        - anf_storage

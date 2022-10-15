@@ -1,5 +1,6 @@
 ---
-- hosts: all
+- name: Setup Netweaver resources in the Pacemaker cluster
+  hosts: all
   become: true
   become_user: root
 
@@ -8,6 +9,9 @@
 
   tasks:
     - name: Configure SAP Netweaver cluster
+      when:
+        - sap_ha
+        - sap_instance_type == "ASCS"
       block:
         # Ensure that the cluster is in maintenance mode
         - name: Ensure Cluster is in maintenance mode
@@ -332,7 +336,3 @@
           changed_when: "'error' not in sap_ha_cluster_mode.stdout"
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
-
-      when:
-        - sap_ha|bool == true
-        - sap_instance_type == "ASCS"

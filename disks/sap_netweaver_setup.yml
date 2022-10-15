@@ -1,5 +1,6 @@
 ---
-- hosts: all
+- name: Configure Azure Netweaver disks
+  hosts: all
   become: true
   become_user: root
 
@@ -7,21 +8,23 @@
     sap_anf_options: "rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys,suid"
 
   tasks:
-    # Install parted
     - name: Install parted
       ansible.builtin.package:
         name: parted
         state: present
 
-    # Check if SAP disk exist on local system
     - name: Check if /dev/disk/azure/scsi1/lun0 exists
       ansible.builtin.stat:
         path: /dev/disk/azure/scsi1/lun0
       register: stat_result_lun0
 
     - name: Configure local SAP Netweaver disks
+      when:
+        - ansible_facts['system_vendor'] == "Microsoft Corporation"
+        - ansible_facts['product_name'] == "Virtual Machine"
+        - ansible_facts['distribution'] == "RedHat"
+        - stat_result_lun0.stat.exists
       block:
-        # Setup disk layout for sap system
         - name: Use all disk space on /dev/disk/azure/scsi1/lun0 for LVM
           ansible.builtin.parted:
             device: "/dev/disk/azure/scsi1/lun0"
@@ -29,13 +32,11 @@
             flags: [lvm]
             state: present
 
-        # Setup volume group for SAP
         - name: Create a volume group on /dev/disk/azure/scsi1/lun0-part1
           community.general.lvg:
             vg: sapvg
             pvs: /dev/disk/azure/scsi1/lun0-part1
 
-        # Setup logical volumes for SAP
         - name: Create 48G logical volume usrsaplv in volume group sapvg (SAP)
           community.general.lvol:
             vg: sapvg
@@ -52,9 +53,8 @@
           loop:
             - sapmntlv
           when:
-            - anf_storage|bool == false
+            - not anf_storage
 
-        # Format logical SAP volumes
         - name: Create an xfs filesystem on /dev/sapvg/usrsaplv
           community.general.filesystem:
             fstype: xfs
@@ -71,9 +71,8 @@
           loop:
             - /dev/sapvg/sapmntlv
           when:
-            - anf_storage|bool == false
+            - not anf_storage
 
-        # Create SAP mount points
         - name: Create SAP directory /sapmnt
           ansible.builtin.file:
             path: "{{ item }}"
@@ -90,34 +89,31 @@
           loop:
             - /sapmnt
           when:
-            - anf_storage|bool == false
+            - not anf_storage
 
-        # Mount logical SAP volumes
-        - name: mount the usrsaplv on /usr/sap
+        - name: Mount the usrsaplv on /usr/sap
           ansible.posix.mount:
             path: /usr/sap
             src: /dev/sapvg/usrsaplv
             fstype: xfs
             state: mounted
 
-        - name: mount the sapmntlv on /sapmnt
+        - name: Mount the sapmntlv on /sapmnt
           ansible.posix.mount:
             path: /sapmnt
             src: /dev/sapvg/sapmntlv
             fstype: xfs
             state: mounted
           when:
-            - anf_storage|bool == false
+            - not anf_storage
 
+    - name: Configure ANF SAP Netweaver disks
       when:
         - ansible_facts['system_vendor'] == "Microsoft Corporation"
         - ansible_facts['product_name'] == "Virtual Machine"
         - ansible_facts['distribution'] == "RedHat"
-        - stat_result_lun0.stat.exists
-
-    - name: Configure ANF SAP Netweaver disks
+        - anf_storage
       block:
-        # Create SAP mount points
         - name: Create SAP directory /sapmnt/SID for ABAP
           ansible.builtin.file:
             path: "{{ item }}"
@@ -136,7 +132,6 @@
           when:
             - sap_instance_java_sid is defined
 
-        # Mount logical SAP volumes
         - name: Mount ANF NFS on /sapmnt/SID for ABAP
           ansible.posix.mount:
             path: "/sapmnt/{{ sap_instance_sid }}"
@@ -155,7 +150,6 @@
           when:
             - sap_instance_java_sid is defined
 
-        # Create SAP mount points
         - name: Create SAP directory /usr/sap/SID/SYS for ABAP
           ansible.builtin.file:
             path: "{{ item }}"
@@ -177,7 +171,6 @@
             - sap_instance_type == "ASCS"
             - sap_instance_java_sid is defined
 
-        # Mount logical SAP volumes
         - name: Mount ANF NFS on /usr/sap/SID/SYS for ABAP
           ansible.posix.mount:
             path: "/usr/sap/{{ sap_instance_sid }}/SYS"
@@ -198,9 +191,3 @@
           when:
             - sap_instance_type == "ASCS"
             - sap_instance_java_sid is defined
-
-      when:
-        - ansible_facts['system_vendor'] == "Microsoft Corporation"
-        - ansible_facts['product_name'] == "Virtual Machine"
-        - ansible_facts['distribution'] == "RedHat"
-        - anf_storage
