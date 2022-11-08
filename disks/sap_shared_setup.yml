@@ -8,6 +8,7 @@
     nfs_options: "rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys,suid"
     sap_anf_shared_saptrans: "10.242.91.139:/Global-saptrans"
     sap_anf_shared_sapmedia: "10.242.90.132:/sapdump"
+    sap_apf_shared_backupmedia: "sapstr01.file.core.windows.net:/sapstr01/global-backup"
     sap_apf_shared_itgdata: "sapstr01.file.core.windows.net:/sapstr01/global-itgdata"
 
   tasks:
@@ -27,6 +28,11 @@
           ansible.builtin.stat:
             path: /media/sap
           register: stat_result_sapmedia
+
+        - name: Check if /media/backup exists
+          ansible.builtin.stat:
+            path: /media/backup
+          register: stat_result_backupmedia
 
         - name: Check if /itgdata/SID exists
           ansible.builtin.stat:
@@ -52,6 +58,14 @@
             mode: "0775"
           when:
             - not stat_result_sapmedia.stat.exists
+
+        - name: Create shared directory /media/backup
+          ansible.builtin.file:
+            path: /media/backup
+            state: directory
+            mode: "0775"
+          when:
+            - not stat_result_backupmedia.stat.exists
 
         - name: Create shared directory /itgdata/SID
           ansible.builtin.file:
@@ -81,6 +95,14 @@
           ansible.posix.mount:
             path: /media/sap
             src: "{{ sap_anf_shared_sapmedia }}"
+            opts: "{{ nfs_options }}"
+            fstype: nfs
+            state: mounted
+
+        - name: Mount ANF NFS on /media/backup
+          ansible.posix.mount:
+            path: /media/backup
+            src: "{{ sap_apf_shared_backupmedia }}"
             opts: "{{ nfs_options }}"
             fstype: nfs
             state: mounted
