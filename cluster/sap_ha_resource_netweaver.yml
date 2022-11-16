@@ -284,7 +284,17 @@
           ansible.builtin.shell:
             cmd: |
               /usr/sbin/pcs constraint colocation add g-{{ sap_instance_sid }}_AERS \
-              with g-{{ sap_instance_sid }}_ASCS -5000
+              with g-{{ sap_instance_sid }}_ASCS score=-5000
+          register: sap_ha_cluster_resource_create
+          changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
+          when:
+            - ansible_facts['fqdn'] == sap_ha_primary
+
+        - name: Create ERS location
+          ansible.builtin.shell:
+            cmd: |
+              /usr/sbin/pcs constraint location rsc_sap_{{ sap_instance_sid }}_ASCS{{ sap_ha_ascs_instance_number }} \
+              rule score=2000 runs_ers_{{ sap_instance_sid }} eq 1
           register: sap_ha_cluster_resource_create
           changed_when: "'Assumed agent name' in sap_ha_cluster_resource_create.stdout"
           when:
