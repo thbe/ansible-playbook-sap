@@ -8,6 +8,6 @@
   tasks:
     # Stop local SAP server
     - name: Stop local SAP server
-      ansible.builtin.command: /opt/sap/bin/sap_stop
+      ansible.builtin.command: /opt/sap/bin/sap.sh stop
       register: sap_stop_command
       changed_when: sap_stop_command.rc != 0
