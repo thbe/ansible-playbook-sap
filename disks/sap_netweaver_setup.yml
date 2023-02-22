@@ -26,7 +26,7 @@
         - stat_result_lun0.stat.exists
       block:
         - name: Use all disk space on /dev/disk/azure/scsi1/lun0 for LVM
-          ansible.builtin.parted:
+          community.general.parted:
             device: "/dev/disk/azure/scsi1/lun0"
             number: 1
             flags: [lvm]
