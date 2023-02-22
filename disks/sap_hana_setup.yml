@@ -60,7 +60,7 @@
         - stat_result_lun6.stat.exists
       block:
         - name: Use remaining disk space for LVM
-          ansible.builtin.parted:
+          community.general.parted:
             device: "{{ item }}"
             number: 1
             flags: [lvm]
