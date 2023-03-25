@@ -24,7 +24,7 @@ jobs:
             jinja2
             ansible-lint
             yamllint
-      - run: "yamllint --list-files ."
+      - run: "yamllint -s -f auto --list-files ."
         working-directory: ${{ github.workspace }}
-      - run: "ansible-lint -v --force-color ."
+      - run: "ansible-lint -v --force-color --profile production"
         working-directory: ${{ github.workspace }}
