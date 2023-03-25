@@ -1,4 +1,4 @@
-name: Ansible Lint
+name: Linter
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  lint:
+  linter:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,5 +23,8 @@ jobs:
             ansible
             jinja2
             ansible-lint
-      - run: "ansible-lint -v --force-color"
+            yamllint
+      - run: "yamllint --list-files ."
+        working-directory: ${{ github.workspace }}
+      - run: "ansible-lint -v --force-color ."
         working-directory: ${{ github.workspace }}
