@@ -8,6 +8,8 @@
   tasks:
     # Check local SAP server
     - name: Check local SAP server
-      ansible.builtin.command: /opt/sap/bin/sap.sh status
+      ansible.builtin.command:
+        cmd: /opt/sap/bin/sap.sh status
       register: sap_health_command
-      changed_when: sap_health_command.rc != 0
+      changed_when: false
+      failed_when: sap_health_command.rc != 0
