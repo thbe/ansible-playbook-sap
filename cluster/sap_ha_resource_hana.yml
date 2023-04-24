@@ -1,5 +1,5 @@
 ---
-- name: Setup HANA resources in the Pacemaker cluster
+- name: Setup HANA resources on a Pacemaker cluster
   hosts: all
   become: true
   become_user: root
@@ -8,21 +8,28 @@
     sap_anf_options: "rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys,suid"
 
   tasks:
-    - name: Configure SAP HANA cluster
+    - name: Configure SAP HANA Pacemaker cluster
       when:
         - sap_instance_product == "HANA"
         - sap_ha
       block:
-        # Ensure that the cluster is in maintenance mode
-        - name: Ensure Cluster is in maintenance mode
+        - name: Get Pacemaker properties
+          ansible.builtin.command:
+            cmd: "/usr/sbin/pcs property show -all"
+          register: sap_ha_cluster_properties
+          changed_when: false
+          failed_when: sap_ha_cluster_properties.rc != 0
+
+        - name: Ensure Pacemaker cluster is in maintenance mode
           ansible.builtin.command:
             cmd: "/usr/sbin/pcs property set maintenance-mode=true"
           register: sap_ha_cluster_mode
-          changed_when: "'error' not in sap_ha_cluster_mode.stdout"
+          changed_when: sap_ha_cluster_properties.rc == 0
+          failed_when: sap_ha_cluster_properties.rc != 0
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - "sap_ha_cluster_properties.stdout.find('maintenance-mode: true') == -1"
 
-        # Ensure properties are set correctly
         - name: Ensure Pacemaker stickiness is configured properly
           ansible.builtin.command:
             cmd: "/usr/sbin/pcs resource defaults resource-stickiness=1"
