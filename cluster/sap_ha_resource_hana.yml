@@ -24,8 +24,8 @@
           ansible.builtin.command:
             cmd: "/usr/sbin/pcs property set maintenance-mode=true"
           register: sap_ha_cluster_mode
-          changed_when: sap_ha_cluster_properties.rc == 0
-          failed_when: sap_ha_cluster_properties.rc != 0
+          changed_when: sap_ha_cluster_mode.rc == 0
+          failed_when: sap_ha_cluster_mode.rc != 0
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
             - "sap_ha_cluster_properties.stdout.find('maintenance-mode: true') == -1"
@@ -335,20 +335,31 @@
             - ansible_facts['fqdn'] == sap_ha_primary
             - sap_anf
 
+        - name: Get Pacemaker properties
+          ansible.builtin.command:
+            cmd: "/usr/sbin/pcs property show -all"
+          register: sap_ha_cluster_properties
+          changed_when: false
+          failed_when: sap_ha_cluster_properties.rc != 0
+
         # Disable the stonith device
         - name: Disable stonith for the the Pacemaker high-availability cluster
           ansible.builtin.command:
             cmd: /usr/sbin/pcs property set stonith-enabled=false
           register: sap_ha_cluster_property_set
-          changed_when: "'stonith-enabled: false' in sap_ha_cluster_property_set.stdout"
+          changed_when: sap_ha_cluster_property_set.rc == 0
+          failed_when: sap_ha_cluster_property_set.rc != 0
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - "sap_ha_cluster_properties.stdout.find('maintenance-mode: false') == -1"
 
-        # Ensure that the cluster is not in maintenance mode
-        - name: Ensure Cluster is not in maintenance mode
+        # Ensure Pacemaker cluster is not in maintenance mode
+        - name: Ensure Pacemaker cluster is not in maintenance mode
           ansible.builtin.command:
             cmd: "/usr/sbin/pcs property set maintenance-mode=false"
           register: sap_ha_cluster_mode
-          changed_when: "'error' not in sap_ha_cluster_mode.stdout"
+          changed_when: sap_ha_cluster_mode.rc == 0
+          failed_when: sap_ha_cluster_mode.rc != 0
           when:
             - ansible_facts['fqdn'] == sap_ha_primary
+            - "sap_ha_cluster_properties.stdout.find('maintenance-mode: false') == -1"

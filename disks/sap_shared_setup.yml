@@ -1,22 +1,20 @@
 ---
-- name: Configure Azure shared disks
+- name: Configure SAP shared disks
   hosts: all
   become: true
   become_user: root
 
   vars:
     nfs_options: "rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys,suid"
-    sap_anf_shared_saptrans: "10.242.91.139:/Global-saptrans"
-    sap_anf_shared_sapmedia: "10.242.90.132:/sapdump"
-    sap_apf_shared_backupmedia: "sapstr01.file.core.windows.net:/sapstr01/global-backup"
-    sap_apf_shared_itgdata: "sapstr01.file.core.windows.net:/sapstr01/global-itgdata"
+    sap_shared_saptrans: "10.242.143.1:/global-saptrans"
+    sap_shared_sapmedia: "10.242.143.2:/sapmedia"
+    sap_shared_backupmedia: "10.242.143.3:/global-backup"
+    sap_shared_data: "10.242.143.4:/global-sapdata"
 
   tasks:
     - name: Configure shared disks
       when:
-        - ansible_facts['system_vendor'] == "Microsoft Corporation"
-        - ansible_facts['product_name'] == "Virtual Machine"
-        - ansible_facts['distribution'] == "RedHat"
+        - ansible_facts['os_family'] == "RedHat"
         - sap_instance_sid is defined
       block:
         - name: Check if /usr/sap/trans exists
@@ -34,10 +32,10 @@
             path: /media/backup
           register: stat_result_backupmedia
 
-        - name: Check if /itgdata/SID exists
+        - name: Check if /sapdata/SID exists
           ansible.builtin.stat:
-            path: "/itgdata/{{ sap_instance_sid }}"
-          register: stat_result_itgdata
+            path: "/sapdata/{{ sap_instance_sid }}"
+          register: stat_result_sapdata
 
         - name: Create shared directory /usr/sap/trans
           ansible.builtin.file:
@@ -67,22 +65,22 @@
           when:
             - not stat_result_backupmedia.stat.exists
 
-        - name: Create shared directory /itgdata/SID
+        - name: Create shared directory /sapdata/SID
           ansible.builtin.file:
-            path: "/itgdata/{{ sap_instance_sid }}"
+            path: "/sapdata/{{ sap_instance_sid }}"
             group: sapsys
             state: directory
             mode: "0775"
           when:
-            - not stat_result_itgdata.stat.exists
+            - not stat_result_sapdata.stat.exists
             - sap_instance_type != "Router"
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
 
-        - name: Mount ANF NFS on /usr/sap/trans
+        - name: Mount NFS on /usr/sap/trans
           ansible.posix.mount:
             path: /usr/sap/trans
-            src: "{{ sap_anf_shared_saptrans }}"
+            src: "{{ sap_shared_saptrans }}"
             opts: "{{ nfs_options }}"
             fstype: nfs
             state: mounted
@@ -91,26 +89,26 @@
             - sap_instance_type != "Webdispatcher"
             - sap_instance_type != "DB"
 
-        - name: Mount ANF NFS on /media/sap
+        - name: Mount NFS on /media/sap
           ansible.posix.mount:
             path: /media/sap
-            src: "{{ sap_anf_shared_sapmedia }}"
+            src: "{{ sap_shared_sapmedia }}"
             opts: "{{ nfs_options }}"
             fstype: nfs
             state: mounted
 
-        - name: Mount ANF NFS on /media/backup
+        - name: Mount NFS on /media/backup
           ansible.posix.mount:
             path: /media/backup
-            src: "{{ sap_apf_shared_backupmedia }}"
+            src: "{{ sap_shared_backupmedia }}"
             opts: "{{ nfs_options }}"
             fstype: nfs
             state: mounted
 
-        - name: Mount APF NFS on /itgdata/SID
+        - name: Mount NFS on /sapdata/SID
           ansible.posix.mount:
-            path: "/itgdata/{{ sap_instance_sid }}"
-            src: "{{ sap_apf_shared_itgdata }}/{{ sap_instance_sid }}"
+            path: "/sapdata/{{ sap_instance_sid }}"
+            src: "{{ sap_shared_sapdata }}/{{ sap_instance_sid }}"
             opts: "{{ nfs_options }}"
             fstype: nfs
             state: mounted
